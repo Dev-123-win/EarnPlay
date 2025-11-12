@@ -1,0 +1,3495 @@
+📱 PART 1: FLUTTER APP STRUCTURE
+App Flow & Screens
+Splash Screen
+    ↓
+[Check Auth State]
+    ↓
+├─→ Not Authenticated → Login/Register
+│                           ↓
+│                      Home Screen
+└─→ Authenticated ────────→ Home Screen
+                             ↓
+        ┌────────────────────┼────────────────────┐
+        ↓                    ↓                     ↓
+   Daily Streak      Spin & Win          Games Menu
+        ↓                    ↓                     ↓
+   Watch & Earn         Profile            Tic-Tac-Toe
+        ↓                    ↓                     ↓
+    Referral            Withdrawal          Whack-a-Mole
+
+Screen-by-Screen Breakdown
+1. Splash Screen (splash_screen.dart)
+Purpose: Initialize app, check auth, load cached data
+UI Components:
+
+App logo (centered)
+Loading indicator
+App version text (bottom)
+
+Logic Flow:
+dart1. Initialize Firebase
+2. Load cached user data (SharedPreferences/Hive)
+3. Check Remote Config values
+4. Check authentication state
+5. Navigate to Login or Home
+Material 3 Design:
+
+Use ColorScheme.primary for logo
+CircularProgressIndicator with primary color
+Smooth fade transitions
+
+
+2. Login Screen (login_screen.dart)
+UI Components:
+
+App logo/branding (top)
+Email TextField (Material 3 outlined)
+Password TextField (with visibility toggle)
+"Login" FilledButton
+"Forgot Password?" TextButton
+Divider with "OR"
+"Sign in with Google" OutlinedButton
+"Don't have an account? Register" TextButton
+
+Material 3 Widgets:
+dartTextField with InputDecoration(
+  border: OutlineInputBorder(),
+  labelText: 'Email',
+  prefixIcon: Icon(Icons.email_outlined)
+)
+
+FilledButton(
+  onPressed: _handleLogin,
+  child: Text('Login')
+)
+Logic:
+
+Form validation
+Firebase Auth email/password
+Google Sign-In integration
+Error handling with SnackBar
+Navigate to Home on success
+
+
+3. Register Screen (register_screen.dart)
+UI Components:
+
+Email TextField
+Password TextField
+Confirm Password TextField
+Referral Code TextField (optional)
+"Create Account" FilledButton
+"Already have an account? Login" TextButton
+
+Logic:
+
+Validate email format, password strength
+Check referral code validity (Cloud Function call)
+Create Firebase Auth account
+Create Firestore user document
+Process referral bonus (if code provided)
+Navigate to Home
+
+Initial User Document Structure:
+json{
+  "uid": "user123",
+  "email": "user@example.com",
+  "displayName": "User Name",
+  "coins": 0,
+  "referralCode": "ABC123",
+  "referredBy": "user456", // if used referral code
+  "createdAt": "timestamp",
+  "dailyStreak": {
+    "currentStreak": 0,
+    "lastCheckIn": null,
+    "checkInDates": []
+  },
+  "spinsRemaining": 3,
+  "lastSpinReset": "timestamp",
+  "watchedAdsToday": 0,
+  "lastAdReset": "timestamp",
+  "totalReferrals": 0,
+  "withdrawalHistory": []
+}
+```
+
+---
+
+#### **4. Home Screen** (`home_screen.dart`)
+
+**UI Structure**:
+```
+AppBar:
+├─ App Title
+└─ Actions: [Notification Icon, Profile Avatar]
+
+Body (ScrollView):
+├─ Coin Balance Card (elevated, prominent)
+│  └─ Icon + "X,XXX Coins"
+│
+├─ Daily Streak Card (quick access)
+│  └─ "X/7 Days" + Claim Button
+│
+├─ Features Grid (2x2 or 2x3)
+│  ├─ Daily Streak
+│  ├─ Watch & Earn
+│  ├─ Spin & Win
+│  ├─ Tic-Tac-Toe
+│  ├─ Whack-a-Mole
+│  └─ Referral
+│
+├─ Banner Ad (bottom-pinned)
+└─ Navigation Bar (Material 3)
+    ├─ Home
+    ├─ Games
+    ├─ Earn
+    └─ Profile
+Material 3 Components:
+dart// Coin Balance Card
+Card.filled(
+  child: Padding(
+    child: Row(
+      children: [
+        Icon(Icons.monetization_on, size: 48),
+        SizedBox(width: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Your Balance', style: Theme.of(context).textTheme.labelMedium),
+            Text('${coins} Coins', style: Theme.of(context).textTheme.headlineMedium)
+          ]
+        )
+      ]
+    )
+  )
+)
+
+// Feature Cards Grid
+GridView.count(
+  crossAxisCount: 2,
+  children: [
+    _buildFeatureCard(
+      icon: Icons.calendar_today,
+      title: 'Daily Streak',
+      subtitle: '${streak}/7 days',
+      onTap: () => Navigator.pushNamed(context, '/daily-streak')
+    ),
+    // ... other features
+  ]
+)
+```
+
+**Logic**:
+- Load user data from local cache immediately (instant UI)
+- Fetch latest data from Firestore in background
+- Listen to FCM for real-time updates
+- Handle navigation to feature screens
+
+---
+
+#### **5. Daily Streak Screen** (`daily_streak_screen.dart`)
+
+**UI Structure**:
+```
+AppBar:
+├─ Title: "Daily Streak"
+└─ Wallet Icon + Coin Count
+
+Body:
+├─ Progress Card (prominent, elevated)
+│  └─ "X out of 7 Days"
+│  └─ LinearProgressIndicator
+│  └─ "Keep it up! X more days to go"
+│
+├─ Streak Calendar (7 cards in list)
+│  ├─ Day 1: [✓] Claimed - 10 coins
+│  ├─ Day 2: [✓] Claimed - 15 coins
+│  ├─ Day 3: [Claim Button] 20 coins ← Today
+│  ├─ Day 4: [Locked] 25 coins
+│  ├─ Day 5: [Locked] 30 coins
+│  ├─ Day 6: [Locked] 40 coins
+│  └─ Day 7: [Locked] 100 coins (bonus)
+│
+└─ Info Card
+   └─ "Check in daily to earn coins!"
+Material 3 Design:
+dart// Progress Card
+Card.filled(
+  color: Theme.of(context).colorScheme.primaryContainer,
+  child: Column(
+    children: [
+      Text('3 out of 7 Days', 
+        style: Theme.of(context).textTheme.headlineLarge
+      ),
+      LinearProgressIndicator(value: 3/7),
+      Text('Keep going! 4 more days to complete')
+    ]
+  )
+)
+
+// Day Card (Claimable)
+Card.outlined(
+  child: ListTile(
+    leading: CircleAvatar(
+      child: Text('3'),
+      backgroundColor: Theme.of(context).colorScheme.primary
+    ),
+    title: Text('Day 3'),
+    subtitle: Text('20 Coins'),
+    trailing: FilledButton(
+      onPressed: _claimStreak,
+      child: Text('Claim')
+    )
+  )
+)
+
+// Day Card (Claimed)
+Card(
+  child: ListTile(
+    leading: CircleAvatar(
+      child: Icon(Icons.check),
+      backgroundColor: Colors.green
+    ),
+    title: Text('Day 1'),
+    subtitle: Text('10 Coins'),
+    trailing: Icon(Icons.check_circle, color: Colors.green)
+  )
+)
+
+// Day Card (Locked)
+Card.outlined(
+  child: ListTile(
+    enabled: false,
+    leading: CircleAvatar(
+      child: Icon(Icons.lock),
+      backgroundColor: Theme.of(context).colorScheme.surfaceVariant
+    ),
+    title: Text('Day 5'),
+    subtitle: Text('30 Coins'),
+    trailing: Icon(Icons.lock_outline)
+  )
+)
+Logic:
+dartFuture<void> _claimStreak() async {
+  // 1. Show rewarded ad first
+  await _showRewardedAd();
+  
+  // 2. Call Cloud Function to claim
+  final response = await functions.httpsCallable('claimDailyStreak').call();
+  
+  // 3. Update local state
+  setState(() {
+    coins += response.data['coinsEarned'];
+    currentStreak = response.data['currentStreak'];
+  });
+  
+  // 4. Show success dialog
+  _showSuccessDialog(response.data['coinsEarned']);
+}
+
+// Streak Reset Logic (handled by Cloud Function)
+// - Check if last check-in was yesterday
+// - If missed a day, reset streak to 0
+// - If completed 7 days, reset to 0 and give bonus
+```
+
+---
+
+#### **6. Watch & Earn Screen** (`watch_earn_screen.dart`)
+
+**UI Structure**:
+```
+AppBar:
+├─ Title: "Watch & Earn"
+└─ Wallet Icon + Coin Count
+
+Body:
+├─ Daily Limit Card
+│  └─ "X/10 Ads Watched Today"
+│  └─ CircularProgressIndicator (shows progress)
+│
+├─ Reward Info Card
+│  └─ "Watch ads to earn coins!"
+│  └─ "5-10 coins per ad"
+│
+├─ Video List (scrollable)
+│  ├─ Ad Card 1: [Watch Ad Button] → 7 coins
+│  ├─ Ad Card 2: [Watch Ad Button] → 5 coins
+│  ├─ Ad Card 3: [Watch Ad Button] → 8 coins
+│  └─ ... (shows next available ads)
+│
+└─ Native Ad (embedded in list)
+Material 3 Design:
+dart// Daily Limit Card
+Card.filled(
+  color: watchedAds < 10 
+    ? Theme.of(context).colorScheme.primaryContainer
+    : Theme.of(context).colorScheme.surfaceVariant,
+  child: Column(
+    children: [
+      Text('$watchedAds/10 Ads', 
+        style: Theme.of(context).textTheme.headlineMedium
+      ),
+      SizedBox(height: 16),
+      CircularProgressIndicator(
+        value: watchedAds / 10,
+        strokeWidth: 8
+      ),
+      SizedBox(height: 8),
+      Text(watchedAds < 10 
+        ? '${10 - watchedAds} ads remaining'
+        : 'Come back tomorrow!'
+      )
+    ]
+  )
+)
+
+// Ad Watch Card
+Card.outlined(
+  child: ListTile(
+    leading: Icon(Icons.play_circle_outline, size: 48),
+    title: Text('Watch Ad'),
+    subtitle: Text('Earn 5-10 coins'),
+    trailing: FilledButton.icon(
+      icon: Icon(Icons.play_arrow),
+      label: Text('Watch'),
+      onPressed: watchedAds < 10 ? _loadRewardedAd : null
+    )
+  )
+)
+Logic:
+dartFuture<void> _loadRewardedAd() async {
+  // 1. Check daily limit locally
+  if (watchedAds >= 10) {
+    _showLimitReachedDialog();
+    return;
+  }
+  
+  // 2. Load & show rewarded ad
+  final ad = await RewardedAd.load(...);
+  final reward = await ad.show();
+  
+  if (reward != null) {
+    // 3. Calculate random reward (5-10 coins)
+    final coinsEarned = 5 + Random().nextInt(6);
+    
+    // 4. Call Cloud Function to record
+    await functions.httpsCallable('recordAdWatch').call({
+      'coinsEarned': coinsEarned
+    });
+    
+    // 5. Update local state
+    setState(() {
+      coins += coinsEarned;
+      watchedAds++;
+    });
+    
+    // 6. Show reward dialog
+    _showRewardDialog(coinsEarned);
+  }
+}
+
+// Reset handled by scheduled Cloud Function at midnight
+```
+
+---
+
+#### **7. Spin & Win Screen** (`spin_win_screen.dart`)
+
+**UI Structure**:
+```
+AppBar:
+├─ Title: "Spin & Win"
+└─ Row:
+    ├─ Wallet Icon
+    ├─ Divider
+    └─ "X Coins"
+
+Body:
+├─ Spins Remaining Card
+│  └─ "Claim +1 Spin" Button (if available)
+│  └─ Or "X/3 Spins Remaining"
+│
+├─ Spin Wheel (centered, interactive)
+│  └─ 6 Segments:
+│      ├─ Try Again (60° - gray)
+│      ├─ 3 Coins (60° - blue)
+│      ├─ 6 Coins (60° - green)
+│      ├─ 9 Coins (60° - yellow)
+│      ├─ 10 Coins (60° - orange)
+│      └─ 30 Coins (60° - gold)
+│  └─ Center Spin Button
+│
+└─ Rules Card
+   └─ "3 free spins daily"
+   └─ "Watch ad for +1 spin"
+Material 3 Design:
+dart// Spins Card
+Card.filled(
+  child: Column(
+    children: [
+      Text('$spinsRemaining/3 Spins Left',
+        style: Theme.of(context).textTheme.headlineSmall
+      ),
+      SizedBox(height: 16),
+      FilledButton.icon(
+        icon: Icon(Icons.add),
+        label: Text('Watch Ad for +1 Spin'),
+        onPressed: spinsRemaining < 3 ? _watchAdForSpin : null
+      )
+    ]
+  )
+)
+
+// Spin Wheel (Custom Widget)
+CustomPaint(
+  painter: SpinWheelPainter(
+    segments: [
+      WheelSegment(label: 'Try Again', value: 0, color: Colors.grey),
+      WheelSegment(label: '3', value: 3, color: Colors.blue),
+      WheelSegment(label: '6', value: 6, color: Colors.green),
+      WheelSegment(label: '9', value: 9, color: Colors.yellow),
+      WheelSegment(label: '10', value: 10, color: Colors.orange),
+      WheelSegment(label: '30', value: 30, color: Colors.amber),
+    ],
+    rotation: _rotation
+  ),
+  child: Center(
+    child: FloatingActionButton.large(
+      onPressed: _spinWheel,
+      child: Icon(Icons.play_arrow, size: 48)
+    )
+  )
+)
+Logic:
+dartFuture<void> _spinWheel() async {
+  if (spinsRemaining <= 0) {
+    _showNoSpinsDialog();
+    return;
+  }
+  
+  // 1. Call Cloud Function to get result
+  final response = await functions.httpsCallable('spinWheel').call();
+  
+  final result = response.data['result']; // 0, 3, 6, 9, 10, or 30
+  final targetRotation = response.data['rotation']; // angle to land on
+  
+  // 2. Animate wheel spin
+  await _animateWheelSpin(targetRotation);
+  
+  // 3. Update local state
+  setState(() {
+    spinsRemaining = response.data['spinsRemaining'];
+    if (result > 0) coins += result;
+  });
+  
+  // 4. Show result dialog
+  _showResultDialog(result);
+}
+
+Future<void> _watchAdForSpin() async {
+  // Show rewarded ad
+  final ad = await RewardedAd.load(...);
+  final reward = await ad.show();
+  
+  if (reward != null) {
+    // Call Cloud Function to add spin
+    await functions.httpsCallable('addBonusSpin').call();
+    
+    setState(() {
+      spinsRemaining++;
+    });
+  }
+}
+
+// Wheel Animation
+Future<void> _animateWheelSpin(double targetRotation) async {
+  final controller = AnimationController(
+    duration: Duration(seconds: 3),
+    vsync: this
+  );
+  
+  final animation = Tween<double>(
+    begin: 0,
+    end: targetRotation + (360 * 5) // 5 full rotations + target
+  ).animate(CurvedAnimation(
+    parent: controller,
+    curve: Curves.easeOutCubic
+  ));
+  
+  animation.addListener(() {
+    setState(() {
+      _rotation = animation.value;
+    });
+  });
+  
+  await controller.forward();
+  controller.dispose();
+}
+```
+
+---
+
+#### **8. Tic-Tac-Toe Screen** (`tictactoe_screen.dart`)
+
+**UI Structure**:
+```
+AppBar:
+├─ Title: "Tic-Tac-Toe"
+├─ Score: "Wins: X | Losses: Y"
+└─ Wallet Icon + Coin Count
+
+Body:
+├─ Game Mode Card
+│  ├─ [Easy] Button
+│  ├─ [Medium] Button
+│  └─ [Hard] Button
+│
+├─ Game Board (3x3 Grid)
+│  └─ Interactive cells (X/O)
+│
+├─ Turn Indicator
+│  └─ "Your Turn" / "AI Thinking..."
+│
+└─ Action Buttons
+   ├─ [Reset Game]
+   └─ [New Game]
+Material 3 Design:
+dart// Game Board
+GridView.count(
+  crossAxisCount: 3,
+  children: List.generate(9, (index) {
+    return Card.outlined(
+      child: InkWell(
+        onTap: () => _makeMove(index),
+        child: Center(
+          child: Text(
+            board[index], // 'X', 'O', or ''
+            style: Theme.of(context).textTheme.displayLarge?.copyWith(
+              color: board[index] == 'X' 
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.secondary
+            )
+          )
+        )
+      )
+    );
+  })
+)
+
+// Difficulty Selector
+SegmentedButton<Difficulty>(
+  segments: [
+    ButtonSegment(value: Difficulty.easy, label: Text('Easy')),
+    ButtonSegment(value: Difficulty.medium, label: Text('Medium')),
+    ButtonSegment(value: Difficulty.hard, label: Text('Hard')),
+  ],
+  selected: {_difficulty},
+  onSelectionChanged: (Set<Difficulty> newSelection) {
+    setState(() {
+      _difficulty = newSelection.first;
+    });
+  }
+)
+Logic:
+dartvoid _makeMove(int index) {
+  if (board[index].isNotEmpty || gameOver) return;
+  
+  setState(() {
+    board[index] = 'X'; // Player is X
+    _checkWinner();
+    
+    if (!gameOver) {
+      _aiMove(); // AI is O
+    }
+  });
+}
+
+void _aiMove() {
+  // AI logic based on difficulty
+  int move = switch (_difficulty) {
+    Difficulty.easy => _randomMove(),
+    Difficulty.medium => _mediumAI(),
+    Difficulty.hard => _minimaxMove()
+  };
+  
+  setState(() {
+    board[move] = 'O';
+    _checkWinner();
+  });
+}
+
+void _checkWinner() {
+  // Check rows, columns, diagonals
+  final winPatterns = [
+    [0,1,2], [3,4,5], [6,7,8], // rows
+    [0,3,6], [1,4,7], [2,5,8], // columns
+    [0,4,8], [2,4,6] // diagonals
+  ];
+  
+  for (var pattern in winPatterns) {
+    if (board[pattern[0]] == board[pattern[1]] &&
+        board[pattern[1]] == board[pattern[2]] &&
+        board[pattern[0]].isNotEmpty) {
+      
+      gameOver = true;
+      winner = board[pattern[0]];
+      
+      // Show result dialog
+      _showGameResultDialog(winner == 'X' ? 'win' : 'lose');
+      
+      // Award coins for win (via rewarded ad)
+      if (winner == 'X') {
+        _showRewardedAdForWin();
+      }
+      return;
+    }
+  }
+  
+  // Check for draw
+  if (!board.contains('')) {
+    gameOver = true;
+    _showGameResultDialog('draw');
+  }
+}
+
+Future<void> _showRewardedAdForWin() async {
+  // Show interstitial ad (not every game)
+  if (Random().nextDouble() < 0.3) { // 30% chance
+    await _showInterstitialAd();
+  }
+  
+  // Optionally: offer rewarded ad for bonus coins
+  _showBonusCoinsDialog(); // "Watch ad for +5 coins?"
+}
+```
+
+---
+
+#### **9. Whack-a-Mole Screen** (`whack_mole_screen.dart`)
+
+**UI Structure**:
+```
+AppBar:
+├─ Title: "Whack-a-Mole"
+├─ Score: "High Score: X"
+└─ Wallet Icon + Coin Count
+
+Body:
+├─ Game Stats Card
+│  ├─ Current Score: X
+│  ├─ Time Remaining: Xs
+│  └─ [Start Game] Button
+│
+├─ Game Grid (3x3 holes)
+│  └─ Moles pop up randomly
+│
+└─ After Game:
+   ├─ Final Score
+   ├─ "Watch ad for coins?" Dialog
+   └─ [Play Again] Button
+Material 3 Design:
+dart// Game Grid
+GridView.count(
+  crossAxisCount: 3,
+  children: List.generate(9, (index) {
+    return GestureDetector(
+      onTap: () => _whackMole(index),
+      child: Card.filled(
+        color: moles[index].isVisible
+          ? Theme.of(context).colorScheme.primaryContainer
+          : Theme.of(context).colorScheme.surfaceVariant,
+        child: Center(
+          child: AnimatedScale(
+            scale: moles[index].isVisible ? 1.0 : 0.0,
+            duration: Duration(milliseconds: 200),
+            child: Icon(
+              Icons.pest_control,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary
+            )
+          )
+        )
+      )
+    );
+  })
+)
+
+// Stats Display
+Card.outlined(
+  child: Padding(
+    padding: EdgeInsets.all(16),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        _buildStat('Score', score),
+        _buildStat('Time', '$timeRemaining s'),
+        _buildStat('High', highScore)
+      ]
+    )
+  )
+)
+Logic:
+dartvoid _startGame() {
+  setState(() {
+    score = 0;
+    timeRemaining = 30; // 30 second game
+    gameActive = true;
+  });
+  
+  // Start timer
+  _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+    setState(() {
+      timeRemaining--;
+      if (timeRemaining <= 0) {
+        _endGame();
+      }
+    });
+  });
+  
+  // Start spawning moles
+  _spawnMoles();
+}
+
+void _spawnMoles() {
+  if (!gameActive) return;
+  
+  // Random mole spawn
+  final randomIndex = Random().nextInt(9);
+  setState(() {
+    moles[randomIndex].isVisible = true;
+  });
+  
+  // Hide after 800ms
+  Future.delayed(Duration(milliseconds: 800), () {
+    if (mounted) {
+      setState(() {
+        moles[randomIndex].isVisible = false;
+      });
+    }
+  });
+  
+  // Spawn next mole after delay
+  final nextSpawn = 400 + Random().nextInt(600); // 400-1000ms
+  Future.delayed(Duration(milliseconds: nextSpawn), _spawnMoles);
+}
+
+void _whackMole(int index) {
+  if (moles[index].isVisible) {
+    setState(() {
+      moles[index].isVisible = false;
+      score += 10;
+    });
+    
+    // Haptic feedback
+    HapticFeedback.mediumImpact();
+  }
+}
+
+void _endGame() {
+  _timer?.cancel();
+  setState(() {
+    gameActive = false;
+    if (score > highScore) {
+      highScore = score;
+      // Save to local storage
+      _saveHighScore();
+    }
+  });
+  
+  // Show interstitial ad occasionally
+  if (Random().nextDouble() < 0.4) {
+    _showInterstitialAd();
+  }
+  
+  // Show result dialog with coin reward option
+  _showGameResultDialog();
+}
+```
+
+---
+
+#### **10. Profile Screen** (`profile_screen.dart`)
+
+**UI Structure**:
+```
+AppBar:
+├─ Title: "Profile"
+└─ [Edit] IconButton
+
+Body (ScrollView):
+├─ User Info Card
+│  ├─ Avatar (large, circular)
+│  ├─ Display Name
+│  ├─ Email
+│  └─ Member Since
+│
+├─ Stats Card
+│  ├─ Total Coins Earned
+│  ├─ Current Streak
+│  ├─ Games Played
+│  └─ Referrals Made
+│
+├─ Settings Section
+│  ├─ Notifications Toggle
+│  ├─ Sound Effects Toggle
+│  └─ Theme Selector
+│
+└─ Actions
+   ├─ [Logout] OutlinedButton
+   └─ [Delete Account] TextButton (danger)
+Material 3 Design:
+dart// User Info Card
+Card.filled(
+  child: Column(
+    children: [
+      CircleAvatar(
+        radius: 48,
+        backgroundImage: NetworkImage(user.photoURL ?? ''),
+        child: user.photoURL == null ? Icon(Icons.person, size: 48) : null
+      ),
+      SizedBox(height: 16),
+      Text(user.displayName ?? 'User',
+        style: Theme.of(context).textTheme.headlineSmall
+      ),
+      Text(user.email!,
+        style: Theme.of(context).textTheme.bodyMedium
+      ),
+      SizedBox(height: 8),
+      Chip(
+        avatar: Icon(Icons.calendar_today, size: 16),
+        label: Text('Member since ${_formatDate(user.createdAt)}')
+      )
+    ]
+  )
+)
+
+// Stats Grid
+Card.outlined(
+  child: Padding(
+    padding: EdgeInsets.all(16),
+    child: Column(
+      children: [
+        ListTile(
+          leading: Icon(Icons.monetization_on),
+          title: Text('Total Coins Earned'),
+          trailing: Text('$totalCoins', style: Theme.of(context).textTheme.titleLarge)
+        ),
+        Divider(),
+        ListTile(
+          leading: Icon(Icons.local_fire_department),
+          title: Text('Current Streak'),
+          trailing: Text('$currentStreak days')
+        ),
+        // ... more stats
+      ]
+    )
+  )
+)
+
+// Settings
+SwitchListTile(
+  title: Text('Notifications'),
+  subtitle: Text('Receive daily reminders'),
+  value: notificationsEnabled,
+  onChanged: (value) {
+    setState(() {
+      notificationsEnabled = value;
+    });
+    _updateNotificationSettings(value);
+  }
+)
+```
+
+---
+
+#### **11. Referral Screen** (`referral_screen.dart`)
+
+**UI Structure**:
+```
+AppBar:
+├─ Title: "Refer & Earn"
+└─ Wallet Icon + Coin Count
+
+Body:
+├─ Referral Code Card (prominent)
+│  ├─ "Your Referral Code"
+│  ├─ Code Display (large, bold)
+│  ├─ [Copy Code] Button
+│  └─ [Share] Button
+│
+├─ Rewards Info Card
+│  ├─ "Earn 50 coins per referral!"
+│  └─ "Your friend gets 25 coins bonus"
+│
+├─ Referral Stats
+│  ├─ Total Referrals: X
+│  ├─ Coins Earned: Y
+│  └─ Pending Referrals: Z
+│
+└─ Referral List (expandable)
+   └─ Recent referrals with status
+Material 3 Design:
+dart// Referral Code Card
+Card.filled(
+  color: Theme.of(context).colorScheme.primaryContainer,
+  child: Padding(
+    padding: EdgeInsets.all(24),
+    child: Column(
+      children: [
+        Text('Your Referral Code',
+          style: Theme.of(context).textTheme.titleMedium
+        ),
+        SizedBox(height: 16),
+        Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline,
+              width: 2
+            )
+          ),
+          child: Text(
+            referralCode,
+            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              letterSpacing: 4
+            )
+          )
+        ),
+        SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            FilledButton.icon(
+              icon: Icon(Icons.copy),
+              label: Text('Copy'),
+              onPressed: _copyReferralCode
+            ),
+            FilledButton.tonalIcon(
+              icon: Icon(Icons.share),
+              label: Text('Share'),
+              onPressed: _shareReferralCode
+            )
+          ]
+        )
+      ]
+    )
+  )
+)
+
+// Stats Display
+Card.outlined(
+  child: Column(
+    children: [
+      ListTile(
+        leading: Icon(Icons.people),
+        title: Text('Total Referrals'),
+        trailing: Text('$totalReferrals', 
+          style: Theme.of(context).textTheme.headlineSmall
+        )
+      ),
+      Divider(),
+      ListTile(
+        leading: Icon(Icons.monetization_on),
+        title: Text('Coins Earned'),
+        trailing: Text('RetrySContinuedart        trailing: Text('$referralCoins', 
+          style: Theme.of(context).textTheme.headlineSmall
+        )
+      ),
+      Divider(),
+      ListTile(
+        leading: Icon(Icons.pending),
+        title: Text('Pending Referrals'),
+        trailing: Text('$pendingReferrals')
+      )
+    ]
+  )
+)
+
+// Referral List
+ExpansionTile(
+  title: Text('Referral History'),
+  children: referralHistory.map((referral) {
+    return ListTile(
+      leading: CircleAvatar(
+        child: Text(referral.name[0])
+      ),
+      title: Text(referral.name),
+      subtitle: Text(_formatDate(referral.joinedAt)),
+      trailing: Chip(
+        label: Text(referral.status), // 'Active', 'Pending'
+        backgroundColor: referral.status == 'Active'
+          ? Colors.green.shade100
+          : Colors.orange.shade100
+      )
+    );
+  }).toList()
+)
+Logic:
+dartFuture<void> _copyReferralCode() async {
+  await Clipboard.setData(ClipboardData(text: referralCode));
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('Referral code copied!'),
+      behavior: SnackBarBehavior.floating
+    )
+  );
+}
+
+Future<void> _shareReferralCode() async {
+  final shareText = '''
+Join this amazing rewards app and earn coins!
+Use my referral code: $referralCode
+Download: https://yourapp.com/download
+  ''';
+  
+  await Share.share(shareText);
+}
+
+// Referral bonus is handled by Cloud Function when new user registers
+```
+
+---
+
+#### **12. Withdrawal Screen** (`withdrawal_screen.dart`)
+
+**UI Structure**:
+```
+AppBar:
+├─ Title: "Withdraw"
+└─ Wallet Icon + Coin Count
+
+Body:
+├─ Balance Card
+│  ├─ Available Balance
+│  ├─ Minimum Withdrawal: 1000 coins
+│  └─ Conversion Rate: 100 coins = $1
+│
+├─ Withdrawal Method Selector
+│  ├─ [PayPal] Radio
+│  ├─ [Gift Card] Radio
+│  └─ [Bank Transfer] Radio (if applicable)
+│
+├─ Amount Input
+│  ├─ Coins TextField
+│  └─ Equivalent $ display
+│
+├─ Account Details (based on method)
+│  └─ PayPal Email / Gift Card preference
+│
+├─ [Request Withdrawal] FilledButton
+│
+└─ Withdrawal History
+   └─ List of past withdrawals with status
+Material 3 Design:
+dart// Balance Card
+Card.filled(
+  color: Theme.of(context).colorScheme.tertiaryContainer,
+  child: Padding(
+    padding: EdgeInsets.all(24),
+    child: Column(
+      children: [
+        Text('Available Balance',
+          style: Theme.of(context).textTheme.titleMedium
+        ),
+        SizedBox(height: 8),
+        Text('$coins Coins',
+          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+            fontWeight: FontWeight.bold
+          )
+        ),
+        SizedBox(height: 8),
+        Text('≈ \$${(coins / 100).toStringAsFixed(2)}',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: Theme.of(context).colorScheme.onTertiaryContainer.withOpacity(0.7)
+          )
+        ),
+        Divider(height: 32),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Minimum Withdrawal:'),
+            Text('1000 coins',
+              style: Theme.of(context).textTheme.titleMedium
+            )
+          ]
+        )
+      ]
+    )
+  )
+)
+
+// Withdrawal Method
+Card.outlined(
+  child: Column(
+    children: [
+      RadioListTile<WithdrawalMethod>(
+        title: Row(
+          children: [
+            Icon(Icons.payment),
+            SizedBox(width: 8),
+            Text('PayPal')
+          ]
+        ),
+        subtitle: Text('Receive via PayPal (2-3 days)'),
+        value: WithdrawalMethod.paypal,
+        groupValue: selectedMethod,
+        onChanged: (value) {
+          setState(() => selectedMethod = value!);
+        }
+      ),
+      RadioListTile<WithdrawalMethod>(
+        title: Row(
+          children: [
+            Icon(Icons.card_giftcard),
+            SizedBox(width: 8),
+            Text('Gift Card')
+          ]
+        ),
+        subtitle: Text('Amazon, Google Play, etc. (instant)'),
+        value: WithdrawalMethod.giftCard,
+        groupValue: selectedMethod,
+        onChanged: (value) {
+          setState(() => selectedMethod = value!);
+        }
+      )
+    ]
+  )
+)
+
+// Amount Input
+TextField(
+  controller: _amountController,
+  keyboardType: TextInputType.number,
+  decoration: InputDecoration(
+    labelText: 'Withdrawal Amount',
+    hintText: 'Enter coins to withdraw',
+    prefixIcon: Icon(Icons.monetization_on),
+    suffixText: 'coins',
+    helperText: 'Equivalent: \$${(_amountController.text.isEmpty ? 0 : int.parse(_amountController.text) / 100).toStringAsFixed(2)}',
+    border: OutlineInputBorder()
+  ),
+  onChanged: (value) {
+    setState(() {}); // Update equivalent display
+  }
+)
+
+// Withdrawal History
+ExpansionTile(
+  title: Text('Withdrawal History'),
+  children: withdrawalHistory.map((withdrawal) {
+    return ListTile(
+      leading: Icon(
+        withdrawal.status == 'completed' ? Icons.check_circle : Icons.pending,
+        color: withdrawal.status == 'completed' ? Colors.green : Colors.orange
+      ),
+      title: Text('${withdrawal.amount} coins'),
+      subtitle: Text('${withdrawal.method} • ${_formatDate(withdrawal.date)}'),
+      trailing: Chip(
+        label: Text(withdrawal.status),
+        backgroundColor: withdrawal.status == 'completed'
+          ? Colors.green.shade100
+          : withdrawal.status == 'pending'
+            ? Colors.orange.shade100
+            : Colors.red.shade100
+      )
+    );
+  }).toList()
+)
+Logic:
+dartFuture<void> _requestWithdrawal() async {
+  final amount = int.tryParse(_amountController.text);
+  
+  // Validation
+  if (amount == null || amount < 1000) {
+    _showError('Minimum withdrawal is 1000 coins');
+    return;
+  }
+  
+  if (amount > coins) {
+    _showError('Insufficient balance');
+    return;
+  }
+  
+  if (selectedMethod == WithdrawalMethod.paypal && paypalEmail.isEmpty) {
+    _showError('Please enter PayPal email');
+    return;
+  }
+  
+  // Show confirmation dialog
+  final confirmed = await _showConfirmationDialog(amount);
+  if (!confirmed) return;
+  
+  try {
+    // Call Cloud Function
+    final response = await functions.httpsCallable('requestWithdrawal').call({
+      'amount': amount,
+      'method': selectedMethod.toString(),
+      'accountDetails': selectedMethod == WithdrawalMethod.paypal
+        ? paypalEmail
+        : selectedGiftCard
+    });
+    
+    // Update local state
+    setState(() {
+      coins -= amount;
+      withdrawalHistory.insert(0, WithdrawalRecord(
+        amount: amount,
+        method: selectedMethod.toString(),
+        status: 'pending',
+        date: DateTime.now()
+      ));
+    });
+    
+    // Show success
+    _showSuccessDialog();
+    
+  } catch (e) {
+    _showError('Withdrawal request failed: ${e.toString()}');
+  }
+}
+
+// Withdrawal processing handled by admin panel/Cloud Function
+// - Verify user balance
+// - Create withdrawal record in Firestore
+// - Deduct coins
+// - Notify admin for manual processing
+// - Update status when processed
+
+13. Game Result Dialogs (dialogs/game_result_dialog.dart)
+Win Dialog:
+dartAlertDialog(
+  icon: Icon(
+    Icons.emoji_events,
+    size: 64,
+    color: Colors.amber
+  ),
+  title: Text('You Win!',
+    style: TextStyle(
+      fontSize: 28,
+      fontWeight: FontWeight.bold,
+      color: Colors.amber
+    )
+  ),
+  content: Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text('Congratulations! 🎉',
+        style: Theme.of(context).textTheme.titleMedium
+      ),
+      SizedBox(height: 16),
+      Card.filled(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Text('Watch ad to earn bonus coins?',
+                textAlign: TextAlign.center
+              ),
+              SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.monetization_on, color: Colors.amber),
+                  SizedBox(width: 4),
+                  Text('+5 Coins',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold
+                    )
+                  )
+                ]
+              )
+            ]
+          )
+        )
+      )
+    ]
+  ),
+  actions: [
+    TextButton(
+      onPressed: () => Navigator.pop(context, false),
+      child: Text('No Thanks')
+    ),
+    FilledButton.icon(
+      icon: Icon(Icons.play_arrow),
+      label: Text('Watch Ad'),
+      onPressed: () => Navigator.pop(context, true)
+    )
+  ]
+)
+Lose Dialog:
+dartAlertDialog(
+  icon: Icon(
+    Icons.sentiment_dissatisfied,
+    size: 64,
+    color: Theme.of(context).colorScheme.error
+  ),
+  title: Text('You Lose',
+    style: TextStyle(
+      fontSize: 24,
+      fontWeight: FontWeight.bold
+    )
+  ),
+  content: Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text('Better luck next time!'),
+      SizedBox(height: 16),
+      Text('Keep playing to improve your skills',
+        style: Theme.of(context).textTheme.bodySmall,
+        textAlign: TextAlign.center
+      )
+    ]
+  ),
+  actions: [
+    TextButton(
+      onPressed: () => Navigator.pop(context, false),
+      child: Text('Exit')
+    ),
+    FilledButton(
+      onPressed: () => Navigator.pop(context, true),
+      child: Text('Play Again')
+    )
+  ]
+)
+Draw Dialog:
+dartAlertDialog(
+  icon: Icon(
+    Icons.handshake,
+    size: 64,
+    color: Colors.blue
+  ),
+  title: Text('It\'s a Draw!'),
+  content: Text('Well played! Want to try again?',
+    textAlign: TextAlign.center
+  ),
+  actions: [
+    TextButton(
+      onPressed: () => Navigator.pop(context, false),
+      child: Text('Exit')
+    ),
+    FilledButton(
+      onPressed: () => Navigator.pop(context, true),
+      child: Text('Play Again')
+    )
+  ]
+)
+
+🏗️ PART 2: APP ARCHITECTURE
+Local State Management
+Using Provider Pattern:
+dart// lib/providers/user_provider.dart
+class UserProvider extends ChangeNotifier {
+  User? _user;
+  UserData? _userData;
+  
+  int get coins => _userData?.coins ?? 0;
+  int get dailyStreak => _userData?.dailyStreak.currentStreak ?? 0;
+  int get spinsRemaining => _userData?.spinsRemaining ?? 0;
+  int get watchedAds => _userData?.watchedAdsToday ?? 0;
+  
+  Future<void> loadUserData() async {
+    // 1. Load from local cache first (instant UI)
+    _userData = await LocalStorage.getUserData();
+    notifyListeners();
+    
+    // 2. Fetch from Firestore in background
+    try {
+      final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_user!.uid)
+        .get();
+      
+      if (doc.exists) {
+        _userData = UserData.fromMap(doc.data()!);
+        await LocalStorage.saveUserData(_userData!);
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+    }
+  }
+  
+  void updateCoins(int amount) {
+    _userData!.coins += amount;
+    LocalStorage.saveUserData(_userData!);
+    notifyListeners();
+  }
+  
+  void updateStreak(int newStreak) {
+    _userData!.dailyStreak.currentStreak = newStreak;
+    LocalStorage.saveUserData(_userData!);
+    notifyListeners();
+  }
+  
+  // ... other update methods
+}
+
+// Usage in widgets
+class HomeScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final userProvider = context.watch<UserProvider>();
+    
+    return Scaffold(
+      body: Column(
+        children: [
+          Text('${userProvider.coins} Coins'),
+          Text('${userProvider.dailyStreak} Day Streak')
+        ]
+      )
+    );
+  }
+}
+Local Storage (Hive):
+dart// lib/services/local_storage.dart
+class LocalStorage {
+  static late Box<UserData> _userBox;
+  
+  static Future<void> init() async {
+    await Hive.initFlutter();
+    Hive.registerAdapter(UserDataAdapter());
+    _userBox = await Hive.openBox<UserData>('userData');
+  }
+  
+  static Future<UserData?> getUserData() async {
+    return _userBox.get('current');
+  }
+  
+  static Future<void> saveUserData(UserData data) async {
+    await _userBox.put('current', data);
+  }
+  
+  static Future<void> clearUserData() async {
+    await _userBox.clear();
+  }
+}
+
+// Models with Hive annotations
+@HiveType(typeId: 0)
+class UserData {
+  @HiveField(0)
+  final String uid;
+  
+  @HiveField(1)
+  int coins;
+  
+  @HiveField(2)
+  DailyStreak dailyStreak;
+  
+  @HiveField(3)
+  int spinsRemaining;
+  
+  @HiveField(4)
+  int watchedAdsToday;
+  
+  @HiveField(5)
+  String referralCode;
+  
+  @HiveField(6)
+  DateTime lastSync;
+  
+  // ... constructor, fromMap, toMap methods
+}
+
+Firebase Integration
+Firebase Setup (lib/services/firebase_service.dart):
+dartclass FirebaseService {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  
+  // Authentication
+  Future<User?> signInWithEmail(String email, String password) async {
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password
+      );
+      return credential.user;
+    } catch (e) {
+      throw _handleAuthError(e);
+    }
+  }
+  
+  Future<User?> signUpWithEmail({
+    required String email,
+    required String password,
+    String? referralCode
+  }) async {
+    try {
+      // Create auth account
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password
+      );
+      
+      // Call Cloud Function to create user document and process referral
+      await _functions.httpsCallable('createUser').call({
+        'uid': credential.user!.uid,
+        'email': email,
+        'referralCode': referralCode
+      });
+      
+      return credential.user;
+    } catch (e) {
+      throw _handleAuthError(e);
+    }
+  }
+  
+  Future<void> signOut() async {
+    await _auth.signOut();
+    await LocalStorage.clearUserData();
+  }
+  
+  // Firestore Operations
+  Future<UserData?> getUserData(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        return UserData.fromMap(doc.data()!);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting user data: $e');
+      return null;
+    }
+  }
+  
+  Stream<UserData> userDataStream(String uid) {
+    return _firestore
+      .collection('users')
+      .doc(uid)
+      .snapshots()
+      .map((doc) => UserData.fromMap(doc.data()!));
+  }
+  
+  // FCM Token Management
+  Future<void> initializeFCM() async {
+    // Request permission
+    NotificationSettings settings = await _messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true
+    );
+    
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      // Get FCM token
+      String? token = await _messaging.getToken();
+      
+      // Save to Firestore
+      if (token != null) {
+        await updateFCMToken(token);
+      }
+      
+      // Listen for token refresh
+      _messaging.onTokenRefresh.listen(updateFCMToken);
+    }
+  }
+  
+  Future<void> updateFCMToken(String token) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid != null) {
+      await _firestore.collection('users').doc(uid).update({
+        'fcmToken': token,
+        'fcmTokenUpdatedAt': FieldValue.serverTimestamp()
+      });
+    }
+  }
+  
+  // Cloud Function Calls
+  Future<Map<String, dynamic>> claimDailyStreak() async {
+    final result = await _functions.httpsCallable('claimDailyStreak').call();
+    return Map<String, dynamic>.from(result.data);
+  }
+  
+  Future<Map<String, dynamic>> spinWheel() async {
+    final result = await _functions.httpsCallable('spinWheel').call();
+    return Map<String, dynamic>.from(result.data);
+  }
+  
+  Future<Map<String, dynamic>> recordAdWatch(int coinsEarned) async {
+    final result = await _functions.httpsCallable('recordAdWatch').call({
+      'coinsEarned': coinsEarned
+    });
+    return Map<String, dynamic>.from(result.data);
+  }
+  
+  Future<void> requestWithdrawal({
+    required int amount,
+    required String method,
+    required String accountDetails
+  }) async {
+    await _functions.httpsCallable('requestWithdrawal').call({
+      'amount': amount,
+      'method': method,
+      'accountDetails': accountDetails
+    });
+  }
+}
+FCM Message Handling:
+dart// lib/services/notification_service.dart
+class NotificationService {
+  static Future<void> initialize() async {
+    // Handle foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print('Foreground message: ${message.notification?.title}');
+      
+      // Show local notification
+      _showLocalNotification(message);
+      
+      // Handle data payload
+      if (message.data['type'] == 'sync_data') {
+        _handleDataSync();
+      } else if (message.data['type'] == 'coin_update') {
+        _handleCoinUpdate(message.data);
+      }
+    });
+    
+    // Handle background/terminated messages
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      print('Message clicked: ${message.notification?.title}');
+      _handleMessageClick(message);
+    });
+    
+    // Check for initial message (app opened from terminated state)
+    RemoteMessage? initialMessage = 
+      await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      _handleMessageClick(initialMessage);
+    }
+  }
+  
+  static Future<void> _handleDataSync() async {
+    // Fetch latest data from Firestore
+    final userProvider = GetIt.instance<UserProvider>();
+    await userProvider.loadUserData();
+  }
+  
+  static void _handleCoinUpdate(Map<String, dynamic> data) {
+    final userProvider = GetIt.instance<UserProvider>();
+    final coins = int.parse(data['coins']);
+    userProvider.updateCoins(coins - userProvider.coins);
+  }
+  
+  static void _handleMessageClick(RemoteMessage message) {
+    // Navigate based on message data
+    final navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
+    
+    switch (message.data['type']) {
+      case 'daily_streak':
+        navigatorKey.currentState?.pushNamed('/daily-streak');
+        break;
+      case 'spin_win':
+        navigatorKey.currentState?.pushNamed('/spin-win');
+        break;
+      case 'withdrawal_completed':
+        navigatorKey.currentState?.pushNamed('/withdrawal');
+        break;
+    }
+  }
+}
+
+Ad Integration
+Google Mobile Ads Setup (lib/services/ad_service.dart):
+dartclass AdService {
+  static final AdService _instance = AdService._internal();
+  factory AdService() => _instance;
+  AdService._internal();
+  
+  // Ad Unit IDs (use test IDs during development)
+  static const String _rewardedAdUnitId = Platform.isAndroid
+    ? 'ca-app-pub-3940256099942544/5224354917' // Test ID
+    : 'ca-app-pub-3940256099942544/1712485313';
+  
+  static const String _interstitialAdUnitId = Platform.isAndroid
+    ? 'ca-app-pub-3940256099942544/1033173712'
+    : 'ca-app-pub-3940256099942544/4411468910';
+  
+  static const String _bannerAdUnitId = Platform.isAndroid
+    ? 'ca-app-pub-3940256099942544/6300978111'
+    : 'ca-app-pub-3940256099942544/2934735716';
+  
+  RewardedAd? _rewardedAd;
+  InterstitialAd? _interstitialAd;
+  
+  // Initialize SDK
+  Future<void> initialize() async {
+    await MobileAds.instance.initialize();
+    
+    // Load ads proactively
+    _loadRewardedAd();
+    _loadInterstitialAd();
+  }
+  
+  // Rewarded Ads
+  Future<void> _loadRewardedAd() async {
+    await RewardedAd.load(
+      adUnitId: _rewardedAdUnitId,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          _rewardedAd = ad;
+          print('Rewarded ad loaded');
+          
+          // Set callbacks
+          _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+            onAdDismissedFullScreenContent: (ad) {
+              ad.dispose();
+              _loadRewardedAd(); // Load next ad
+            },
+            onAdFailedToShowFullScreenContent: (ad, error) {
+              ad.dispose();
+              _loadRewardedAd();
+            }
+          );
+        },
+        onAdFailedToLoad: (error) {
+          print('Rewarded ad failed to load: $error');
+          // Retry after delay
+          Future.delayed(Duration(seconds: 5), _loadRewardedAd);
+        }
+      )
+    );
+  }
+  
+  Future<RewardItem?> showRewardedAd() async {
+    if (_rewardedAd == null) {
+      print('Rewarded ad not ready');
+      return null;
+    }
+    
+    final completer = Completer<RewardItem?>();
+    
+    _rewardedAd!.show(
+      onUserEarnedReward: (ad, reward) {
+        completer.complete(reward);
+      }
+    );
+    
+    return completer.future;
+  }
+  
+  // Interstitial Ads
+  Future<void> _loadInterstitialAd() async {
+    await InterstitialAd.load(
+      adUnitId: _interstitialAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          _interstitialAd = ad;
+          
+          _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+            onAdDismissedFullScreenContent: (ad) {
+              ad.dispose();
+              _loadInterstitialAd();
+            },
+            onAdFailedToShowFullScreenContent: (ad, error) {
+              ad.dispose();
+              _loadInterstitialAd();
+            }
+          );
+        },
+        onAdFailedToLoad: (error) {
+          print('Interstitial ad failed to load: $error');
+          Future.delayed(Duration(seconds: 5), _loadInterstitialAd);
+        }
+      )
+    );
+  }
+  
+  Future<void> showInterstitialAd() async {
+    if (_interstitialAd != null) {
+      await _interstitialAd!.show();
+    }
+  }
+  
+  // Banner Ads
+  BannerAd createBannerAd() {
+    return BannerAd(
+      adUnitId: _bannerAdUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) => print('Banner ad loaded'),
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          print('Banner ad failed to load: $error');
+        }
+      )
+    )..load();
+  }
+  
+  void dispose() {
+    _rewardedAd?.dispose();
+    _interstitialAd?.dispose();
+  }
+}
+Ad Widget Implementation:
+dart// lib/widgets/banner_ad_widget.dart
+class BannerAdWidget extends StatefulWidget {
+  @override
+  _BannerAdWidgetState createState() => _BannerAdWidgetState();
+}
+
+class _BannerAdWidgetState extends State<BannerAdWidget> {
+  BannerAd? _bannerAd;
+  bool _isLoaded = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _bannerAd = AdService().createBannerAd();
+    _bannerAd!.listener = BannerAdListener(
+      onAdLoaded: (_) {
+        setState(() => _isLoaded = true);
+      },
+      onAdFailedToLoad: (ad, error) {
+        ad.dispose();
+      }
+    );
+    _bannerAd!.load();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoaded && _bannerAd != null) {
+      return Container(
+        height: 50,
+        alignment: Alignment.center,
+        child: AdWidget(ad: _bannerAd!)
+      );
+    }
+    return SizedBox.shrink();
+  }
+  
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
+  }
+}
+```
+
+---
+
+## ☁️ **PART 3: BACKEND ARCHITECTURE (VERCEL + CLOUD FUNCTIONS)**
+
+### **Architecture Overview**
+```
+Flutter App
+    ↓
+Firebase Auth (authentication)
+    ↓
+    ├→ Firestore (read user data, limited writes)
+    ├→ FCM (receive notifications)
+    └→ Vercel Cloud Functions (business logic)
+          ↓
+       [Node.js/Next.js API Routes]
+          ↓
+    ├→ Firestore Admin SDK (unlimited read/write)
+    ├→ FCM Admin SDK (send notifications)
+    └→ External APIs (payment processing, etc.)
+          ↓
+    GitHub Actions (scheduled tasks)
+          ↓
+    Trigger Vercel Functions
+```
+
+---
+
+### **Vercel Backend Setup**
+
+**Project Structure**:
+```
+vercel-backend/
+├── package.json
+├── vercel.json
+├── api/
+│   ├── auth/
+│   │   └── create-user.js
+│   ├── rewards/
+│   │   ├── claim-streak.js
+│   │   ├── spin-wheel.js
+│   │   └── record-ad-watch.js
+│   ├── games/
+│   │   └── record-game-result.js
+│   ├── referrals/
+│   │   ├── validate-code.js
+│   │   └── process-referral.js
+│   ├── withdrawals/
+│   │   └── request-withdrawal.js
+│   └── scheduled/
+│       ├── reset-daily-limits.js
+│       └── sync-reminder.js
+├── lib/
+│   ├── firebase-admin.js
+│   ├── utils.js
+│   └── constants.js
+└── middleware/
+    ├── auth.js
+    └── rate-limit.js
+vercel.json Configuration:
+json{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    }
+  ],
+  "env": {
+    "FIREBASE_PROJECT_ID": "@firebase-project-id",
+    "FIREBASE_CLIENT_EMAIL": "@firebase-client-email",
+    "FIREBASE_PRIVATE_KEY": "@firebase-private-key"
+  }
+}
+package.json:
+json{
+  "name": "rewards-app-backend",
+  "version": "1.0.0",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3"
+  }
+}
+
+Firebase Admin SDK Setup
+lib/firebase-admin.js:
+javascriptconst admin = require('firebase-admin');
+
+// Initialize Firebase Admin
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+    })
+  });
+}
+
+const db = admin.firestore();RetrySContinueconst auth = admin.auth();
+const messaging = admin.messaging();
+module.exports = { admin, db, auth, messaging };
+
+---
+
+### **Authentication Middleware**
+
+**middleware/auth.js**:
+```javascript
+const { auth } = require('../lib/firebase-admin');
+
+async function verifyToken(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        error: 'Unauthorized',
+        message: 'Missing or invalid authorization header' 
+      });
+    }
+    
+    const token = authHeader.split('Bearer ')[1];
+    
+    // Verify Firebase ID token
+    const decodedToken = await auth.verifyIdToken(token);
+    req.user = {
+      uid: decodedToken.uid,
+      email: decodedToken.email
+    };
+    
+    next();
+  } catch (error) {
+    console.error('Auth error:', error);
+    return res.status(401).json({ 
+      error: 'Unauthorized',
+      message: 'Invalid token' 
+    });
+  }
+}
+
+module.exports = { verifyToken };
+```
+
+**middleware/rate-limit.js**:
+```javascript
+const rateLimit = {};
+
+function checkRateLimit(userId, action, limit, windowMs) {
+  const now = Date.now();
+  const key = `${userId}:${action}`;
+  
+  if (!rateLimit[key]) {
+    rateLimit[key] = [];
+  }
+  
+  // Clean old entries
+  rateLimit[key] = rateLimit[key].filter(time => now - time < windowMs);
+  
+  if (rateLimit[key].length >= limit) {
+    return false;
+  }
+  
+  rateLimit[key].push(now);
+  return true;
+}
+
+function rateLimitMiddleware(action, limit, windowMs) {
+  return (req, res, next) => {
+    const userId = req.user.uid;
+    
+    if (!checkRateLimit(userId, action, limit, windowMs)) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded',
+        message: 'Too many requests. Please try again later.'
+      });
+    }
+    
+    next();
+  };
+}
+
+module.exports = { rateLimitMiddleware };
+```
+
+---
+
+### **API Endpoints**
+
+#### **1. Create User** (`api/auth/create-user.js`)
+```javascript
+const { db, auth } = require('../../lib/firebase-admin');
+const { generateReferralCode } = require('../../lib/utils');
+
+module.exports = async (req, res) => {
+  // Allow CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  
+  try {
+    const { uid, email, referralCode } = req.body;
+    
+    if (!uid || !email) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Generate unique referral code for new user
+    const userReferralCode = await generateReferralCode();
+    
+    // Create user document
+    const userData = {
+      uid,
+      email,
+      displayName: email.split('@')[0],
+      coins: 0,
+      referralCode: userReferralCode,
+      referredBy: null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      dailyStreak: {
+        currentStreak: 0,
+        lastCheckIn: null,
+        checkInDates: []
+      },
+      spinsRemaining: 3,
+      lastSpinReset: new Date(),
+      watchedAdsToday: 0,
+      lastAdReset: new Date(),
+      totalReferrals: 0,
+      totalCoinsEarned: 0,
+      gamesPlayed: 0,
+      withdrawalHistory: []
+    };
+    
+    // If referral code provided, validate and process
+    if (referralCode) {
+      const referrerQuery = await db.collection('users')
+        .where('referralCode', '==', referralCode)
+        .limit(1)
+        .get();
+      
+      if (!referrerQuery.empty) {
+        const referrerDoc = referrerQuery.docs[0];
+        const referrerId = referrerDoc.id;
+        
+        // Update new user
+        userData.referredBy = referrerId;
+        userData.coins = 25; // Bonus for using referral code
+        
+        // Update referrer in a batch
+        const batch = db.batch();
+        
+        // Create user document
+        batch.set(db.collection('users').doc(uid), userData);
+        
+        // Update referrer
+        batch.update(db.collection('users').doc(referrerId), {
+          totalReferrals: admin.firestore.FieldValue.increment(1),
+          coins: admin.firestore.FieldValue.increment(50)
+        });
+        
+        // Create referral record
+        batch.set(db.collection('referrals').doc(), {
+          referrerId,
+          referredUserId: uid,
+          referredUserEmail: email,
+          status: 'active',
+          coinsAwarded: 50,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        await batch.commit();
+        
+        // Send FCM notification to referrer
+        try {
+          const referrerData = referrerDoc.data();
+          if (referrerData.fcmToken) {
+            await messaging.send({
+              token: referrerData.fcmToken,
+              notification: {
+                title: '🎉 New Referral!',
+                body: 'Someone used your referral code! You earned 50 coins.'
+              },
+              data: {
+                type: 'referral_success',
+                coins: '50'
+              }
+            });
+          }
+        } catch (fcmError) {
+          console.error('FCM error:', fcmError);
+          // Don't fail the request if notification fails
+        }
+        
+        return res.status(201).json({
+          success: true,
+          message: 'User created with referral bonus',
+          userData: {
+            ...userData,
+            referralBonus: 25,
+            referrerBonus: 50
+          }
+        });
+      } else {
+        return res.status(400).json({ 
+          error: 'Invalid referral code' 
+        });
+      }
+    }
+    
+    // Create user without referral
+    await db.collection('users').doc(uid).set(userData);
+    
+    return res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      userData
+    });
+    
+  } catch (error) {
+    console.error('Error creating user:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+};
+```
+
+---
+
+#### **2. Claim Daily Streak** (`api/rewards/claim-streak.js`)
+```javascript
+const { db } = require('../../lib/firebase-admin');
+const { verifyToken } = require('../../middleware/auth');
+const { rateLimitMiddleware } = require('../../middleware/rate-limit');
+
+// Streak reward values
+const STREAK_REWARDS = {
+  1: 10,
+  2: 15,
+  3: 20,
+  4: 25,
+  5: 30,
+  6: 40,
+  7: 100 // Bonus for completing full week
+};
+
+async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  
+  try {
+    const userId = req.user.uid;
+    
+    // Get user document
+    const userDoc = await db.collection('users').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userData = userDoc.data();
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // Check if already claimed today
+    const lastCheckIn = userData.dailyStreak.lastCheckIn?.toDate();
+    if (lastCheckIn) {
+      const lastCheckInDate = new Date(
+        lastCheckIn.getFullYear(), 
+        lastCheckIn.getMonth(), 
+        lastCheckIn.getDate()
+      );
+      
+      if (lastCheckInDate.getTime() === today.getTime()) {
+        return res.status(400).json({ 
+          error: 'Already claimed',
+          message: 'You have already claimed your daily streak today' 
+        });
+      }
+    }
+    
+    // Calculate new streak
+    let newStreak = 1;
+    let resetStreak = false;
+    
+    if (lastCheckIn) {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const lastCheckInDate = new Date(
+        lastCheckIn.getFullYear(), 
+        lastCheckIn.getMonth(), 
+        lastCheckIn.getDate()
+      );
+      
+      if (lastCheckInDate.getTime() === yesterday.getTime()) {
+        // Consecutive day
+        newStreak = userData.dailyStreak.currentStreak + 1;
+        
+        // Reset after completing 7 days
+        if (newStreak > 7) {
+          newStreak = 1;
+          resetStreak = true;
+        }
+      } else {
+        // Missed a day, reset streak
+        newStreak = 1;
+        resetStreak = true;
+      }
+    }
+    
+    // Calculate coins earned
+    const coinsEarned = STREAK_REWARDS[newStreak];
+    
+    // Update user document
+    await db.collection('users').doc(userId).update({
+      coins: admin.firestore.FieldValue.increment(coinsEarned),
+      totalCoinsEarned: admin.firestore.FieldValue.increment(coinsEarned),
+      'dailyStreak.currentStreak': newStreak,
+      'dailyStreak.lastCheckIn': admin.firestore.FieldValue.serverTimestamp(),
+      'dailyStreak.checkInDates': admin.firestore.FieldValue.arrayUnion(today.toISOString())
+    });
+    
+    // Log transaction
+    await db.collection('transactions').add({
+      userId,
+      type: 'daily_streak',
+      amount: coinsEarned,
+      streak: newStreak,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return res.status(200).json({
+      success: true,
+      coinsEarned,
+      currentStreak: newStreak,
+      newBalance: userData.coins + coinsEarned,
+      isReset: resetStreak,
+      message: resetStreak 
+        ? 'Congratulations on completing the streak! Starting fresh.' 
+        : `Day ${newStreak} streak claimed!`
+    });
+    
+  } catch (error) {
+    console.error('Error claiming streak:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+}
+
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  // Apply middleware
+  await verifyToken(req, res, async () => {
+    await rateLimitMiddleware('claim_streak', 2, 60000)(req, res, async () => {
+      await handler(req, res);
+    });
+  });
+};
+```
+
+---
+
+#### **3. Spin Wheel** (`api/rewards/spin-wheel.js`)
+```javascript
+const { db } = require('../../lib/firebase-admin');
+const { verifyToken } = require('../../middleware/auth');
+
+// Wheel configuration with probabilities
+const WHEEL_SEGMENTS = [
+  { value: 0, label: 'Try Again', probability: 0.40, angle: 0 },
+  { value: 3, label: '3 Coins', probability: 0.25, angle: 60 },
+  { value: 6, label: '6 Coins', probability: 0.15, angle: 120 },
+  { value: 9, label: '9 Coins', probability: 0.10, angle: 180 },
+  { value: 10, label: '10 Coins', probability: 0.07, angle: 240 },
+  { value: 30, label: '30 Coins', probability: 0.03, angle: 300 }
+];
+
+function getRandomReward() {
+  const random = Math.random();
+  let cumulativeProbability = 0;
+  
+  for (const segment of WHEEL_SEGMENTS) {
+    cumulativeProbability += segment.probability;
+    if (random <= cumulativeProbability) {
+      return segment;
+    }
+  }
+  
+  return WHEEL_SEGMENTS[0]; // Fallback
+}
+
+async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  
+  try {
+    const userId = req.user.uid;
+    
+    // Get user document
+    const userDoc = await db.collection('users').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userData = userDoc.data();
+    
+    // Check if user has spins remaining
+    if (userData.spinsRemaining <= 0) {
+      return res.status(400).json({ 
+        error: 'No spins remaining',
+        message: 'You have used all your spins for today' 
+      });
+    }
+    
+    // Get random reward
+    const reward = getRandomReward();
+    const coinsWon = reward.value;
+    
+    // Calculate target rotation (add multiple full rotations for effect)
+    const baseRotation = reward.angle;
+    const extraRotations = 5 * 360; // 5 full rotations
+    const randomOffset = Math.random() * 30 - 15; // ±15 degrees variance
+    const targetRotation = extraRotations + baseRotation + randomOffset;
+    
+    // Update user document
+    const updateData = {
+      spinsRemaining: admin.firestore.FieldValue.increment(-1)
+    };
+    
+    if (coinsWon > 0) {
+      updateData.coins = admin.firestore.FieldValue.increment(coinsWon);
+      updateData.totalCoinsEarned = admin.firestore.FieldValue.increment(coinsWon);
+    }
+    
+    await db.collection('users').doc(userId).update(updateData);
+    
+    // Log transaction
+    await db.collection('transactions').add({
+      userId,
+      type: 'spin_wheel',
+      amount: coinsWon,
+      result: reward.label,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return res.status(200).json({
+      success: true,
+      result: coinsWon,
+      label: reward.label,
+      rotation: targetRotation,
+      spinsRemaining: userData.spinsRemaining - 1,
+      newBalance: userData.coins + coinsWon
+    });
+    
+  } catch (error) {
+    console.error('Error spinning wheel:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+}
+
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  await verifyToken(req, res, async () => {
+    await handler(req, res);
+  });
+};
+```
+
+---
+
+#### **4. Record Ad Watch** (`api/rewards/record-ad-watch.js`)
+```javascript
+const { db } = require('../../lib/firebase-admin');
+const { verifyToken } = require('../../middleware/auth');
+
+const MAX_ADS_PER_DAY = 10;
+
+async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  
+  try {
+    const userId = req.user.uid;
+    const { coinsEarned } = req.body;
+    
+    if (!coinsEarned || coinsEarned < 5 || coinsEarned > 10) {
+      return res.status(400).json({ 
+        error: 'Invalid coins amount',
+        message: 'Coins must be between 5 and 10' 
+      });
+    }
+    
+    // Get user document
+    const userDoc = await db.collection('users').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userData = userDoc.data();
+    
+    // Check daily limit
+    if (userData.watchedAdsToday >= MAX_ADS_PER_DAY) {
+      return res.status(400).json({ 
+        error: 'Daily limit reached',
+        message: 'You have watched the maximum number of ads today' 
+      });
+    }
+    
+    // Update user document
+    await db.collection('users').doc(userId).update({
+      coins: admin.firestore.FieldValue.increment(coinsEarned),
+      totalCoinsEarned: admin.firestore.FieldValue.increment(coinsEarned),
+      watchedAdsToday: admin.firestore.FieldValue.increment(1)
+    });
+    
+    // Log transaction
+    await db.collection('transactions').add({
+      userId,
+      type: 'watch_ad',
+      amount: coinsEarned,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return res.status(200).json({
+      success: true,
+      coinsEarned,
+      watchedAdsToday: userData.watchedAdsToday + 1,
+      remainingAds: MAX_ADS_PER_DAY - (userData.watchedAdsToday + 1),
+      newBalance: userData.coins + coinsEarned
+    });
+    
+  } catch (error) {
+    console.error('Error recording ad watch:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+}
+
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  await verifyToken(req, res, async () => {
+    await handler(req, res);
+  });
+};
+```
+
+---
+
+#### **5. Request Withdrawal** (`api/withdrawals/request-withdrawal.js`)
+```javascript
+const { db, messaging } = require('../../lib/firebase-admin');
+const { verifyToken } = require('../../middleware/auth');
+
+const MIN_WITHDRAWAL = 1000;
+const WITHDRAWAL_FEE = 0.05; // 5% processing fee
+
+async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  
+  try {
+    const userId = req.user.uid;
+    const { amount, method, accountDetails } = req.body;
+    
+    // Validation
+    if (!amount || !method || !accountDetails) {
+      return res.status(400).json({ 
+        error: 'Missing required fields' 
+      });
+    }
+    
+    if (amount < MIN_WITHDRAWAL) {
+      return res.status(400).json({ 
+        error: 'Below minimum',
+        message: `Minimum withdrawal is ${MIN_WITHDRAWAL} coins` 
+      });
+    }
+    
+    // Get user document
+    const userDoc = await db.collection('users').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userData = userDoc.data();
+    
+    // Check balance
+    if (userData.coins < amount) {
+      return res.status(400).json({ 
+        error: 'Insufficient balance',
+        message: 'You do not have enough coins for this withdrawal' 
+      });
+    }
+    
+    // Calculate fee and net amount
+    const fee = Math.floor(amount * WITHDRAWAL_FEE);
+    const netAmount = amount - fee;
+    const dollarAmount = (netAmount / 100).toFixed(2);
+    
+    // Create withdrawal record
+    const withdrawalRef = await db.collection('withdrawals').add({
+      userId,
+      userEmail: userData.email,
+      amount,
+      fee,
+      netAmount,
+      dollarAmount,
+      method,
+      accountDetails,
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      processedAt: null
+    });
+    
+    // Deduct coins from user
+    await db.collection('users').doc(userId).update({
+      coins: admin.firestore.FieldValue.increment(-amount),
+      withdrawalHistory: admin.firestore.FieldValue.arrayUnion({
+        id: withdrawalRef.id,
+        amount,
+        netAmount,
+        method,
+        status: 'pending',
+        createdAt: new Date()
+      })
+    });
+    
+    // Log transaction
+    await db.collection('transactions').add({
+      userId,
+      type: 'withdrawal',
+      amount: -amount,
+      withdrawalId: withdrawalRef.id,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    // Send notification to admins (in production, use admin dashboard)
+    // For now, log to admin collection
+    await db.collection('admin_notifications').add({
+      type: 'withdrawal_request',
+      userId,
+      withdrawalId: withdrawalRef.id,
+      amount: dollarAmount,
+      method,
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    // Send confirmation notification to user
+    if (userData.fcmToken) {
+      try {
+        await messaging.send({
+          token: userData.fcmToken,
+          notification: {
+            title: 'Withdrawal Request Received',
+            body: `Your withdrawal of $${dollarAmount} is being processed.`
+          },
+          data: {
+            type: 'withdrawal_pending',
+            withdrawalId: withdrawalRef.id
+          }
+        });
+      } catch (fcmError) {
+        console.error('FCM error:', fcmError);
+      }
+    }
+    
+    return res.status(200).json({
+      success: true,
+      withdrawalId: withdrawalRef.id,
+      amount,
+      fee,
+      netAmount,
+      dollarAmount,
+      message: 'Withdrawal request submitted successfully. Processing time: 2-3 business days.'
+    });
+    
+  } catch (error) {
+    console.error('Error processing withdrawal:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+}
+
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  await verifyToken(req, res, async () => {
+    await handler(req, res);
+  });
+};
+```
+
+---
+
+#### **6. Scheduled Functions - Reset Daily Limits** (`api/scheduled/reset-daily-limits.js`)
+```javascript
+const { db } = require('../../lib/firebase-admin');
+
+module.exports = async (req, res) => {
+  // Verify this is called by GitHub Actions with a secret
+  const authSecret = req.headers['x-cron-secret'];
+  
+  if (authSecret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    const now = new Date();
+    const batch = db.batch();
+    let updateCount = 0;
+    
+    // Get all users
+    const usersSnapshot = await db.collection('users').get();
+    
+    usersSnapshot.forEach((doc) => {
+      const userData = doc.data();
+      const lastReset = userData.lastAdReset?.toDate();
+      
+      // Check if last reset was yesterday or earlier
+      if (!lastReset || !isSameDay(lastReset, now)) {
+        batch.update(doc.ref, {
+          watchedAdsToday: 0,
+          spinsRemaining: 3,
+          lastAdReset: admin.firestore.FieldValue.serverTimestamp(),
+          lastSpinReset: admin.firestore.FieldValue.serverTimestamp()
+        });
+        updateCount++;
+      }
+    });
+    
+    if (updateCount > 0) {
+      await batch.commit();
+    }
+    
+    console.log(`Reset daily limits for ${updateCount} users`);
+    
+    return res.status(200).json({
+      success: true,
+      message: `Reset daily limits for ${updateCount} users`,
+      timestamp: now.toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error resetting daily limits:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+};
+
+function isSameDay(date1, date2) {
+  return date1.getFullYear() === date2.getFullYear() &&
+         date1.getMonth() === date2.getMonth() &&
+         date1.getDate() === date2.getDate();
+}
+```
+
+---
+
+#### **7. Send Daily Reminder** (`api/scheduled/send-daily-reminder.js`)
+```javascript
+const { db, messaging } = require('../../lib/firebase-admin');
+
+module.exports = async (req, res) => {
+  const authSecret = req.headers['x-cron-secret'];
+  
+  if (authSecret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    // Get all users with FCM tokens
+    const usersSnapshot = await db.collection('users')
+      .where('fcmToken', '!=', null)
+      .get();
+    
+    const messages = [];
+    
+    usersSnapshot.forEach((doc) => {
+      const userData = doc.data();
+      
+      // Don't send if user has already claimed today
+      const lastCheckIn = userData.dailyStreak.lastCheckIn?.toDate();
+      const today = new Date();
+      
+      if (lastCheckIn && isSameDay(lastCheckIn, today)) {
+        return; // Skip this user
+      }
+      
+      // Create personalized message
+      const currentStreak = userData.dailyStreak.currentStreak || 0;
+      let body = 'Claim your daily reward now!';
+      
+      if (currentStreak > 0) {
+        body = `Don't break your ${currentStreak}-day streak! Claim your reward.`;
+      }
+      
+      messages.push({
+        token: userData.fcmToken,
+        notification: {
+          title: '🔥 Daily Streak Available!',
+          body
+        },
+        data: {
+          type: 'daily_streak_reminder',
+          currentStreak: currentStreak.toString()
+        }
+      });
+    });
+    
+    // Send notifications in batches of 500 (FCM limit)
+    const batchSize = 500;
+    let sentCount = 0;
+    
+    for (let i = 0; i < messages.length; i += batchSize) {
+      const batch = messages.slice(i, i + batchSize);
+      const response = await messaging.sendEach(batch);
+      sentCount += response.successCount;
+      
+      console.log(`Batch ${i / batchSize + 1}: ${response.successCount}/${batch.length} sent`);
+    }
+    
+    return res.status(200).json({
+      success: true,
+      message: `Sent ${sentCount} reminders out of ${messages.length} users`,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error sending reminders:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+};
+
+function isSameDay(date1, date2) {
+  return date1.getFullYear() === date2.getFullYear() &&
+         date1.getMonth() === date2.getMonth() &&
+         date1.getDate() === date2.getDate();
+}
+```
+
+---
+
+### **Utility Functions** (`lib/utils.js`)
+```javascript
+const { db } = require('./firebase-admin');
+
+async function generateReferralCode() {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code;
+  let isUnique = false;
+  
+  while (!isUnique) {
+    code = '';
+    for (let i = 0; i < 6; i++) {
+      code += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    
+    // Check if code already exists
+    const existingCode = await db.collection('users')
+      .where('referralCode', '==', code)
+      .limit(1)
+      .get();
+    
+    if (existingCode.empty) {
+      isUnique = true;
+    }
+  }
+  
+  return code;
+}
+
+function calculateCoinsFromDollars(dollars) {
+  return Math.floor(dollars * 100);
+}
+
+function calculateDollarsFromCoins(coins) {
+  return (coins / 100).toFixed(2);
+}
+
+module.exports = {
+  generateReferralCode,
+  calculateCoinsFromDollars,
+  calculateDollarsFromCoins
+};
+```
+
+---
+
+🤖 PART 4: GITHUB ACTIONS (Continued)
+GitHub Actions Workflow (.github/workflows/scheduled-tasks.yml)
+yamlname: Scheduled Tasks
+
+on:
+  schedule:
+    # Reset daily limits at midnight UTC
+    - cron: '0 0 * * *'
+    
+    # Send daily reminders at 9 AM UTC
+    - cron: '0 9 * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  reset-daily-limits:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Reset Daily Limits
+        run: |
+          curl -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            https://your-vercel-app.vercel.app/api/scheduled/reset-daily-limits
+      
+      - name: Log Result
+        run: echo "Daily limits reset completed at $(date)"
+  
+  send-daily-reminders:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 9 * * *' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Send Daily Reminders
+        run: |
+          curl -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            https://your-vercel-app.vercel.app/api/scheduled/send-daily-reminder
+      
+      - name: Log Result
+        run: echo "Daily reminders sent at $(date)"
+  
+  cleanup-old-transactions:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 0 * * 0' # Weekly on Sunday
+    
+    steps:
+      - name: Cleanup Old Data
+        run: |
+          curl -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            https://your-vercel-app.vercel.app/api/scheduled/cleanup-old-data
+Additional Scheduled Endpoints
+Cleanup Old Data (api/scheduled/cleanup-old-data.js)
+javascriptconst { db } = require('../../lib/firebase-admin');
+
+module.exports = async (req, res) => {
+  const authSecret = req.headers['x-cron-secret'];
+  
+  if (authSecret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    // Delete old transactions (keep last 30 days)
+    const oldTransactions = await db.collection('transactions')
+      .where('timestamp', '<', thirtyDaysAgo)
+      .get();
+    
+    const batch = db.batch();
+    let deleteCount = 0;
+    
+    oldTransactions.forEach((doc) => {
+      batch.delete(doc.ref);
+      deleteCount++;
+      
+      // Firestore batch limit is 500
+      if (deleteCount % 500 === 0) {
+        batch.commit();
+      }
+    });
+    
+    if (deleteCount % 500 !== 0) {
+      await batch.commit();
+    }
+    
+    console.log(`Deleted ${deleteCount} old transactions`);
+    
+    return res.status(200).json({
+      success: true,
+      message: `Cleaned up ${deleteCount} old transactions`,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error cleaning up data:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+};
+
+🔒 PART 5: FIRESTORE SECURITY RULES
+firestore.rules
+javascriptrules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isValidCoinUpdate(before, after) {
+      // Coins can only be updated by Cloud Functions (via admin SDK)
+      // Users cannot directly modify coins
+      return false;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own document
+      allow read: if isAuthenticated() && isOwner(userId);
+      
+      // Users can only update specific fields (not coins)
+      allow update: if isAuthenticated() && isOwner(userId) 
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['coins', 'totalCoinsEarned', 'referralCode']);
+      
+      // Only Cloud Functions can create users
+      allow create: if false;
+      
+      // Users can delete their own account
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Transactions collection (read-only for users)
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Only Cloud Functions can write
+    }
+    
+    // Referrals collection (read-only for users)
+    match /referrals/{referralId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.referrerId == request.auth.uid || 
+         resource.data.referredUserId == request.auth.uid);
+      allow write: if false; // Only Cloud Functions can write
+    }
+    
+    // Withdrawals collection
+    match /withdrawals/{withdrawalId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Only Cloud Functions can write
+    }
+    
+    // Admin collections (admin only)
+    match /admin_notifications/{notificationId} {
+      allow read, write: if false; // Admin dashboard access only
+    }
+    
+    // Remote Config (read-only)
+    match /config/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+  }
+}
+
+📊 PART 6: FIREBASE REMOTE CONFIG
+Remote Config Parameters
+Set these in Firebase Console under Remote Config:
+json{
+  "ad_rewards": {
+    "min_coins": 5,
+    "max_coins": 10
+  },
+  "daily_streak_rewards": {
+    "day_1": 10,
+    "day_2": 15,
+    "day_3": 20,
+    "day_4": 25,
+    "day_5": 30,
+    "day_6": 40,
+    "day_7": 100
+  },
+  "spin_wheel_probabilities": {
+    "try_again": 0.40,
+    "3_coins": 0.25,
+    "6_coins": 0.15,
+    "9_coins": 0.10,
+    "10_coins": 0.07,
+    "30_coins": 0.03
+  },
+  "limits": {
+    "max_ads_per_day": 10,
+    "max_spins_per_day": 3,
+    "min_withdrawal": 1000,
+    "withdrawal_fee": 0.05
+  },
+  "referral_rewards": {
+    "referrer_coins": 50,
+    "referred_coins": 25
+  },
+  "game_settings": {
+    "tic_tac_toe_win_coins": 5,
+    "whack_mole_duration": 30,
+    "interstitial_ad_frequency": 0.3
+  },
+  "maintenance_mode": false,
+  "app_version": "1.0.0",
+  "force_update": false
+}
+Using Remote Config in Flutter
+dart// lib/services/remote_config_service.dart
+import 'package:firebase_remote_config/firebase_remote_config.dart';
+
+class RemoteConfigService {
+  static final FirebaseRemoteConfig _remoteConfig = FirebaseRemoteConfig.instance;
+  
+  static Future<void> initialize() async {
+    await _remoteConfig.setConfigSettings(RemoteConfigSettings(
+      fetchTimeout: const Duration(seconds: 10),
+      minimumFetchInterval: const Duration(hours: 1),
+    ));
+    
+    // Set default values
+    await _remoteConfig.setDefaults({
+      'max_ads_per_day': 10,
+      'max_spins_per_day': 3,
+      'min_withdrawal': 1000,
+      'referrer_coins': 50,
+      'referred_coins': 25,
+      'maintenance_mode': false,
+      'force_update': false,
+    });
+    
+    // Fetch and activate
+    await _remoteConfig.fetchAndActivate();
+  }
+  
+  static int getMaxAdsPerDay() {
+    return _remoteConfig.getInt('max_ads_per_day');
+  }
+  
+  static int getMaxSpinsPerDay() {
+    return _remoteConfig.getInt('max_spins_per_day');
+  }
+  
+  static int getMinWithdrawal() {
+    return _remoteConfig.getInt('min_withdrawal');
+  }
+  
+  static bool isMaintenanceMode() {
+    return _remoteConfig.getBool('maintenance_mode');
+  }
+  
+  static bool shouldForceUpdate() {
+    return _remoteConfig.getBool('force_update');
+  }
+  
+  static Map<String, dynamic> getDailyStreakRewards() {
+    final json = _remoteConfig.getString('daily_streak_rewards');
+    return jsonDecode(json);
+  }
+  
+  static Map<String, dynamic> getSpinWheelProbabilities() {
+    final json = _remoteConfig.getString('spin_wheel_probabilities');
+    return jsonDecode(json);
+  }
+}
+```
+
+---
+
+## 📦 **PART 7: PROJECT STRUCTURE SUMMARY**
+
+### **Flutter App Structure**
+```
+flutter_app/
+├── lib/
+│   ├── main.dart
+│   ├── app.dart
+│   │
+│   ├── screens/
+│   │   ├── splash_screen.dart
+│   │   ├── auth/
+│   │   │   ├── login_screen.dart
+│   │   │   └── register_screen.dart
+│   │   ├── home_screen.dart
+│   │   ├── daily_streak_screen.dart
+│   │   ├── watch_earn_screen.dart
+│   │   ├── spin_win_screen.dart
+│   │   ├── games/
+│   │   │   ├── tictactoe_screen.dart
+│   │   │   └── whack_mole_screen.dart
+│   │   ├── profile_screen.dart
+│   │   ├── referral_screen.dart
+│   │   └── withdrawal_screen.dart
+│   │
+│   ├── widgets/
+│   │   ├── coin_balance_card.dart
+│   │   ├── feature_card.dart
+│   │   ├── banner_ad_widget.dart
+│   │   ├── spin_wheel.dart
+│   │   └── dialogs/
+│   │       ├── game_result_dialog.dart
+│   │       ├── reward_dialog.dart
+│   │       └── confirmation_dialog.dart
+│   │
+│   ├── providers/
+│   │   ├── user_provider.dart
+│   │   ├── game_provider.dart
+│   │   └── ad_provider.dart
+│   │
+│   ├── models/
+│   │   ├── user_data.dart
+│   │   ├── transaction.dart
+│   │   ├── referral.dart
+│   │   └── withdrawal.dart
+│   │
+│   ├── services/
+│   │   ├── firebase_service.dart
+│   │   ├── local_storage.dart
+│   │   ├── ad_service.dart
+│   │   ├── notification_service.dart
+│   │   └── remote_config_service.dart
+│   │
+│   └── utils/
+│       ├── constants.dart
+│       ├── theme.dart
+│       └── helpers.dart
+│
+├── android/
+├── ios/
+├── web/
+├── pubspec.yaml
+└── README.md
+```
+
+### **Backend Structure**
+```
+vercel-backend/
+├── api/
+│   ├── auth/
+│   │   └── create-user.js
+│   ├── rewards/
+│   │   ├── claim-streak.js
+│   │   ├── spin-wheel.js
+│   │   ├── record-ad-watch.js
+│   │   └── add-bonus-spin.js
+│   ├── games/
+│   │   └── record-game-result.js
+│   ├── referrals/
+│   │   ├── validate-code.js
+│   │   └── process-referral.js
+│   ├── withdrawals/
+│   │   ├── request-withdrawal.js
+│   │   └── process-withdrawal.js
+│   └── scheduled/
+│       ├── reset-daily-limits.js
+│       ├── send-daily-reminder.js
+│       └── cleanup-old-data.js
+│
+├── lib/
+│   ├── firebase-admin.js
+│   ├── utils.js
+│   └── constants.js
+│
+├── middleware/
+│   ├── auth.js
+│   └── rate-limit.js
+│
+├── package.json
+├── vercel.json
+└── README.md
+
+🚀 PART 8: DEPLOYMENT CHECKLIST
+Firebase Setup
+
+ Create Firebase project
+ Enable Authentication (Email/Password, Google)
+ Create Firestore database
+ Deploy Firestore security rules
+ Enable Cloud Messaging (FCM)
+ Set up Remote Config parameters
+ Download service account key for backend
+
+Vercel Backend Setup
+
+ Create Vercel account
+ Deploy backend code
+ Set environment variables:
+
+FIREBASE_PROJECT_ID
+FIREBASE_CLIENT_EMAIL
+FIREBASE_PRIVATE_KEY
+CRON_SECRET
+
+
+ Test all API endpoints
+ Configure custom domain (optional)
+
+GitHub Actions Setup
+
+ Add repository secrets:
+
+CRON_SECRET
+
+
+ Enable GitHub Actions
+ Test scheduled workflows manually
+ Monitor workflow runs
+
+Flutter App Setup
+
+ Configure Firebase for Android/iOS
+ Add Google Mobile Ads
+
+Get Ad Unit IDs from AdMob
+Replace test IDs with production IDs
+
+
+ Configure app signing (Android/iOS)
+ Test all features thoroughly
+ Prepare store listings (screenshots, descriptions)
+
+Google Play Store / App Store
+
+ Create developer accounts
+ Prepare privacy policy
+ Prepare terms of service
+
+📈 PART 9: OPTIMIZATION & SCALING
+Performance Optimization
+
+Local Caching Strategy
+
+dartclass CacheManager {
+  static const Duration CACHE_DURATION = Duration(minutes: 5);
+  
+  static Future<UserData?> getCachedUserData() async {
+    final cached = await LocalStorage.getUserData();
+    if (cached != null && cached.lastSync != null) {
+      final age = DateTime.now().difference(cached.lastSync);
+      if (age < CACHE_DURATION) {
+        return cached;
+      }
+    }
+    return null;
+  }
+  
+  static Future<void> invalidateCache() async {
+    await LocalStorage.clearUserData();
+  }
+}
+
+Batch Firestore Operations
+
+javascript// Instead of multiple updates
+await db.collection('users').doc(userId).update({ coins: newCoins });
+await db.collection('users').doc(userId).update({ streak: newStreak });
+
+// Use batch
+const batch = db.batch();
+batch.update(userRef, { 
+  coins: newCoins,
+  streak: newStreak,
+  lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+});
+await batch.commit();
+
+Implement Request Queuing
+
+dartclass RequestQueue {
+  final Queue<Future Function()> _queue = Queue();
+  bool _isProcessing = false;
+  
+  Future<T> add<T>(Future<T> Function() request) async {
+    final completer = Completer<T>();
+    
+    _queue.add(() async {
+      try {
+        final result = await request();
+        completer.complete(result);
+      } catch (error) {
+        completer.completeError(error);
+      }
+    });
+    
+    _processQueue();
+    return completer.future;
+  }
+  
+  Future<void> _processQueue() async {
+    if (_isProcessing || _queue.isEmpty) return;
+    
+    _isProcessing = true;
+    while (_queue.isNotEmpty) {
+      final request = _queue.removeFirst();
+      await request();
+    }
+    _isProcessing = false;
+  }
+}
+Cost Optimization
+
+Firestore Read/Write Minimization
+
+
+Use local cache aggressively
+Batch related operations
+Implement offline-first architecture
+Use Firestore listeners only when necessary
+
+
+Cloud Function Optimization
+
+
+Use edge functions (Vercel Edge)
+Implement response caching
+Minimize cold starts
+Use connection pooling
+
+
+Ad Revenue Optimization
+
+
+A/B test ad placements
+Optimize ad frequency
+Use mediation (multiple ad networks)
+Track eCPM and adjust
+
+
+🎯 FINAL VERDICT
+✅ Feasibility: HIGH
+Your app is absolutely feasible with these modifications:
+What Works Well:
+
+Flutter + Material 3 + Firebase stack is mature and reliable
+Ad-based monetization model is proven
+Feature set provides good user engagement
+Backend architecture is scalable
+
+Critical Changes Made:
+
+Replaced GitHub Actions sync with proper Cloud Functions architecture
+Increased read/write budget to realistic levels (50-100 reads, 10-20 writes/day)
+Added proper security rules to protect user data
+Implemented caching strategy to minimize Firebase costs
+Used FCM for notifications only, not data synchronization
+
