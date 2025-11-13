@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class GameProvider extends ChangeNotifier {
   int _tictactoeWins = 0;
@@ -16,23 +17,38 @@ class GameProvider extends ChangeNotifier {
   bool get isGameActive => _isGameActive;
   String? get error => _error;
 
-  /// Record Tic-Tac-Toe win using Cloud Function (secure reward)
+  /// Record Tic-Tac-Toe win and update Firestore directly (secure via Firestore rules)
   Future<int> recordTictactoeWin({int reward = 50}) async {
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'recordGameWin',
-      );
-      final result = await callable.call({
-        'gameType': 'tictactoe',
-        'score': 100,
-        'reward': reward,
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) throw Exception('User not logged in');
+
+      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+      final gameStatsRef = userRef.collection('game_stats').doc('tictactoe');
+
+      // Update game stats and coins in a batch
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Update user coins
+      batch.update(userRef, {
+        'coins': FieldValue.increment(reward),
+        'lastUpdated': Timestamp.now(),
       });
+
+      // Update game stats
+      batch.update(gameStatsRef, {
+        'wins': FieldValue.increment(1),
+        'totalScore': FieldValue.increment(100),
+        'updatedAt': Timestamp.now(),
+      });
+
+      await batch.commit();
 
       _tictactoeWins++;
       _error = null;
       notifyListeners();
 
-      return result.data['newBalance'] as int;
+      return reward; // Return the reward added
     } catch (e) {
       _error = 'Failed to record game win: $e';
       notifyListeners();
@@ -46,24 +62,42 @@ class GameProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Record Whack-a-Mole win using Cloud Function (secure reward)
+  /// Record Whack-a-Mole win and update Firestore directly
   Future<int> recordWhackMoleWin({required int score}) async {
     final reward = (score / 2).toInt().clamp(5, 100);
 
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'recordGameWin',
-      );
-      final result = await callable.call({
-        'gameType': 'whack_mole',
-        'score': score,
-        'reward': reward,
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) throw Exception('User not logged in');
+
+      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+      final gameStatsRef = userRef.collection('game_stats').doc('whack_mole');
+
+      // Update game stats and coins in a batch
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Update user coins
+      batch.update(userRef, {
+        'coins': FieldValue.increment(reward),
+        'lastUpdated': Timestamp.now(),
       });
+
+      // Update game stats
+      batch.update(gameStatsRef, {
+        'plays': FieldValue.increment(1),
+        'highScore': FieldValue.increment(
+          score > _whackMoleHighScore ? score - _whackMoleHighScore : 0,
+        ),
+        'totalScore': FieldValue.increment(score),
+        'updatedAt': Timestamp.now(),
+      });
+
+      await batch.commit();
 
       updateWhackMoleScore(score);
       _error = null;
 
-      return result.data['newBalance'] as int;
+      return reward;
     } catch (e) {
       _error = 'Failed to record game win: $e';
       notifyListeners();

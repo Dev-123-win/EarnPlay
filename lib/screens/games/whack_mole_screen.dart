@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
-import '../../providers/game_provider.dart';
 
 class WhackMoleScreen extends StatefulWidget {
   const WhackMoleScreen({super.key});
@@ -100,38 +99,30 @@ class _WhackMoleScreenState extends State<WhackMoleScreen> {
   }
 
   void _showGameResult() {
-    final gameProvider = context.read<GameProvider>();
-    gameProvider.updateWhackMoleScore(score);
-
-    final highScore = gameProvider.whackMoleHighScore;
-    final isNewHighScore = score > highScore;
     final coins = (score / 2).toInt().clamp(5, 100);
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: isNewHighScore
-            ? const Text('🏆 New High Score!')
-            : const Text('Game Over'),
+        title: const Text('Game Over 🎮'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               '$score',
-              style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
+              style: Theme.of(
+                context,
+              ).textTheme.displayLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            if (isNewHighScore)
-              const Text('You set a new high score!')
-            else
-              Text('High Score: $highScore'),
+            const Text('Moles Whacked'),
             const SizedBox(height: 16),
             Text(
               'You earned $coins coins!',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: Colors.orange,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -176,158 +167,180 @@ class _WhackMoleScreenState extends State<WhackMoleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Whack a Mole'),
-        elevation: 0,
-        actions: [
-          Consumer<UserProvider>(
-            builder: (context, userProvider, _) {
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.monetization_on, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${userProvider.userData?.coins ?? 0}',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        elevation: 2,
+        centerTitle: true,
       ),
-      body: Consumer<GameProvider>(
-        builder: (context, gameProvider, _) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Score Cards
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                _buildScoreCard(
+                  label: 'Score',
+                  value: '$score',
+                  icon: Icons.sports,
+                  colorScheme: colorScheme,
+                  textTheme: textTheme,
+                ),
+                _buildScoreCard(
+                  label: 'Time',
+                  value: '${timeRemaining}s',
+                  icon: Icons.schedule,
+                  colorScheme: colorScheme,
+                  textTheme: textTheme,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Game Grid
+            AspectRatio(
+              aspectRatio: 1,
+              child: GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemCount: gridSize,
+                itemBuilder: (context, index) => _buildMoleHole(index),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Control Button
+            if (!isGameActive)
+              FilledButton.icon(
+                onPressed: _startGame,
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('Start Game'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 48,
+                    vertical: 16,
+                  ),
+                  backgroundColor: colorScheme.tertiary,
+                ),
+              )
+            else
+              FilledButton.icon(
+                onPressed: _endGame,
+                icon: const Icon(Icons.stop),
+                label: const Text('End Game'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 48,
+                    vertical: 16,
+                  ),
+                  backgroundColor: colorScheme.error,
+                ),
+              ),
+
+            const SizedBox(height: 16),
+
+            // Game Rules
+            Card(
+              elevation: 0,
+              color: colorScheme.secondaryContainer.withValues(alpha: 76),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        child: Column(
-                          children: [
-                            const Text('Score'),
-                            Text(
-                              '$score',
-                              style: Theme.of(context).textTheme.headlineSmall,
-                            ),
-                          ],
-                        ),
+                    Text(
+                      'Game Rules',
+                      style: textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        child: Column(
-                          children: [
-                            const Text('Time'),
-                            Text(
-                              '$timeRemaining"',
-                              style: Theme.of(context).textTheme.headlineSmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        child: Column(
-                          children: [
-                            const Text('High Score'),
-                            Text(
-                              '${gameProvider.whackMoleHighScore}',
-                              style: Theme.of(context).textTheme.headlineSmall,
-                            ),
-                          ],
-                        ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '• Tap the moles before they hide\n• 30 seconds gameplay\n• Each mole = 1 point\n• More points = More coins',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: Colors.grey.shade600,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                AspectRatio(
-                  aspectRatio: 1,
-                  child: GridView.builder(
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                        ),
-                    itemCount: gridSize,
-                    itemBuilder: (context, index) => _buildMoleHole(index),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                if (!isGameActive)
-                  FilledButton.icon(
-                    onPressed: _startGame,
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Start Game'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 48,
-                        vertical: 16,
-                      ),
-                    ),
-                  )
-                else
-                  FilledButton.icon(
-                    onPressed: _endGame,
-                    icon: const Icon(Icons.stop),
-                    label: const Text('End Game'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 48,
-                        vertical: 16,
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
-          );
-        },
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScoreCard({
+    required String label,
+    required String value,
+    required IconData icon,
+    required ColorScheme colorScheme,
+    required TextTheme textTheme,
+  }) {
+    return Expanded(
+      child: Card(
+        elevation: 0,
+        color: colorScheme.primaryContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Icon(icon, color: colorScheme.primary),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: textTheme.headlineSmall?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildMoleHole(int index) {
     final isActive = activeMoleIndex == index && isGameActive;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return GestureDetector(
       onTap: () => _whackMole(index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         decoration: BoxDecoration(
-          color: isActive ? Colors.brown : Colors.grey.shade300,
+          color: isActive
+              ? Colors.brown.shade400
+              : colorScheme.surfaceContainer,
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.brown.shade700, width: 3),
+          border: Border.all(
+            color: isActive ? Colors.brown.shade700 : colorScheme.outline,
+            width: 3,
+          ),
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: Colors.brown.withValues(alpha: 0.5),
+                    color: Colors.brown.withValues(alpha: 128),
                     blurRadius: 8,
                     spreadRadius: 2,
                   ),
@@ -341,7 +354,11 @@ class _WhackMoleScreenState extends State<WhackMoleScreen> {
                   size: 48,
                   color: Colors.amber,
                 )
-              : const Icon(Icons.circle, size: 24, color: Colors.brown),
+              : Icon(
+                  Icons.circle,
+                  size: 24,
+                  color: colorScheme.onSurfaceVariant,
+                ),
         ),
       ),
     );

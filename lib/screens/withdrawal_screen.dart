@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
+import '../utils/dialog_helper.dart';
 
 class WithdrawalScreen extends StatefulWidget {
   const WithdrawalScreen({super.key});
@@ -11,175 +12,143 @@ class WithdrawalScreen extends StatefulWidget {
 }
 
 class _WithdrawalScreenState extends State<WithdrawalScreen> {
-  static const int minimumWithdrawal = 100;
-  static const Map<String, double> exchangeRates = {
-    'UPI': 1.0,
-    'Bank Transfer': 1.0,
-    'PayPal': 1.1,
-  };
+  late TextEditingController _upiController;
+  late TextEditingController _amountController;
+  String _selectedMethod = 'upi';
+  bool _isProcessing = false;
 
-  String selectedMethod = 'UPI';
-  final TextEditingController amountController = TextEditingController();
-  final TextEditingController paymentIdController = TextEditingController();
-  bool isProcessing = false;
+  @override
+  void initState() {
+    super.initState();
+    _upiController = TextEditingController();
+    _amountController = TextEditingController();
+  }
 
   @override
   void dispose() {
-    amountController.dispose();
-    paymentIdController.dispose();
+    _upiController.dispose();
+    _amountController.dispose();
     super.dispose();
   }
 
-  double get selectedExchangeRate => exchangeRates[selectedMethod] ?? 1.0;
-
-  Future<void> _processWithdrawal(UserProvider userProvider) async {
-    final amount = int.tryParse(amountController.text);
-    final paymentId = paymentIdController.text;
-
-    if (amount == null || amount < minimumWithdrawal) {
-      _showError('Minimum withdrawal is $minimumWithdrawal coins');
+  Future<void> _submitWithdrawal(UserProvider userProvider) async {
+    if (_amountController.text.isEmpty) {
+      SnackbarHelper.showError(context, 'Please enter withdrawal amount');
       return;
     }
 
-    if (paymentId.isEmpty) {
-      _showError('Please enter your $selectedMethod ID');
+    if (_selectedMethod == 'upi' && _upiController.text.isEmpty) {
+      SnackbarHelper.showError(context, 'Please enter UPI ID');
       return;
     }
 
-    final userCoins = userProvider.userData?.coins ?? 0;
-    if (amount > userCoins) {
-      _showError('Insufficient coins');
+    final amount = int.tryParse(_amountController.text) ?? 0;
+    final user = userProvider.userData;
+
+    if (amount < 500) {
+      SnackbarHelper.showError(context, 'Minimum withdrawal is ₹500');
       return;
     }
 
-    setState(() => isProcessing = true);
+    if (user != null && amount > user.coins) {
+      SnackbarHelper.showError(context, 'Insufficient balance');
+      return;
+    }
+
+    setState(() => _isProcessing = true);
 
     try {
-      // Show processing dialog
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Processing Withdrawal...'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text('Amount: $amount coins'),
-                Text('Method: $selectedMethod'),
-              ],
-            ),
-          ),
-        );
-      }
-
-      // Simulate processing
-      await Future.delayed(const Duration(seconds: 3));
+      // Simulate withdrawal processing
+      await Future.delayed(const Duration(seconds: 2));
 
       if (mounted) {
-        Navigator.pop(context);
-      }
-
-      // Deduct coins
-      try {
-        await userProvider.updateCoins(-amount);
-        if (mounted && userProvider.userData?.uid != null) {
-          await userProvider.loadUserData(userProvider.userData!.uid);
-        }
-      } catch (e) {
-        debugPrint('Error updating coins: $e');
-      }
-
-      if (mounted) {
-        amountController.clear();
-        paymentIdController.clear();
-        _showSuccess(
-          'Withdrawal request submitted! You\'ll receive $amount coins in 1-2 business days.',
+        DialogSystem.showWithdrawalDialog(
+          context,
+          status: 'Pending',
+          amount: '₹$amount',
+          message:
+              'Your withdrawal request has been submitted.\nYou will receive the amount within 24-48 hours.',
+          onClose: () {
+            _amountController.clear();
+            _upiController.clear();
+          },
         );
       }
     } catch (e) {
       if (mounted) {
-        _showError('Error processing withdrawal: $e');
+        SnackbarHelper.showError(context, 'Error: $e');
       }
     } finally {
       if (mounted) {
-        setState(() => isProcessing = false);
+        setState(() => _isProcessing = false);
       }
     }
   }
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
-
-  void _showSuccess(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('✅ Success'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Withdrawal'),
-        elevation: 0,
-        actions: [
-          Consumer<UserProvider>(
-            builder: (context, userProvider, _) {
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.monetization_on, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${userProvider.userData?.coins ?? 0}',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
+        title: const Text('Withdraw Earnings'),
+        elevation: 2,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        centerTitle: true,
       ),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, _) {
-          final userCoins = userProvider.userData?.coins ?? 0;
+          final user = userProvider.userData;
+
+          if (user == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Available Balance
+                // ========== BALANCE CARD ==========
                 Card(
-                  elevation: 4,
+                  elevation: 0,
+                  color: colorScheme.primaryContainer,
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       children: [
-                        const Text('Available Balance'),
-                        const SizedBox(height: 12),
                         Text(
-                          '$userCoins coins',
-                          style: Theme.of(context).textTheme.displaySmall,
+                          'Available Balance',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: colorScheme.onPrimaryContainer
+                                    .withAlpha(178),
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '₹${user.coins}',
+                          style: Theme.of(context).textTheme.displaySmall
+                              ?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withAlpha(51),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Min. withdrawal: ₹500',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(color: colorScheme.primary),
+                          ),
                         ),
                       ],
                     ),
@@ -187,146 +156,208 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Info Box
+                // ========== WITHDRAWAL FORM ==========
+                Text(
+                  'Enter Withdrawal Details',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 12),
                 Card(
-                  color: Colors.blue.shade50,
+                  elevation: 0,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
-                      children: const [
-                        Icon(Icons.info, color: Colors.blue),
-                        SizedBox(height: 8),
-                        Text(
-                          'Minimum withdrawal is 100 coins',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Withdrawals are processed within 1-2 business days',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Withdrawal Amount
-                Text(
-                  'Withdrawal Amount',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: amountController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(
-                    hintText: 'Enter amount in coins',
-                    prefixIcon: const Icon(Icons.monetization_on),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Payment Method
-                Text(
-                  'Payment Method',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 12),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: DropdownButton<String>(
-                      value: selectedMethod,
-                      isExpanded: true,
-                      underline: const SizedBox.shrink(),
-                      items: exchangeRates.keys
-                          .map(
-                            (method) => DropdownMenuItem(
-                              value: method,
-                              child: Text(method),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => selectedMethod = value);
-                        }
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Payment ID Input
-                Text(
-                  '$selectedMethod ID',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: paymentIdController,
-                  decoration: InputDecoration(
-                    hintText: selectedMethod == 'UPI'
-                        ? 'Enter your UPI ID (name@bank)'
-                        : selectedMethod == 'Bank Transfer'
-                        ? 'Enter your Bank Account Number'
-                        : 'Enter your PayPal Email',
-                    prefixIcon: Icon(_getPaymentIcon()),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Summary
-                Card(
-                  color: Colors.purple.shade50,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Amount:'),
-                            Text(
-                              '${amountController.text.isEmpty ? '0' : amountController.text} coins',
-                            ),
-                          ],
+                        // Amount Field
+                        Text(
+                          'Withdrawal Amount',
+                          style: Theme.of(context).textTheme.labelMedium,
                         ),
-                        const Divider(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Exchange Rate:'),
-                            Text(
-                              '1:${selectedExchangeRate.toStringAsFixed(2)}',
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _amountController,
+                          enabled: !_isProcessing,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: 'Enter amount (₹)',
+                            prefixIcon: const Icon(Iconsax.coin),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ],
+                          ),
                         ),
+                        const SizedBox(height: 20),
+
+                        // Payment Method Selection
+                        Text(
+                          'Payment Method',
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                        const SizedBox(height: 12),
+
+                        // UPI Option
+                        InkWell(
+                          onTap: _isProcessing
+                              ? null
+                              : () {
+                                  setState(() => _selectedMethod = 'upi');
+                                },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: _selectedMethod == 'upi'
+                                    ? colorScheme.primary
+                                    : colorScheme.outline,
+                                width: 2,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Radio.adaptive(
+                                  value: 'upi',
+                                  groupValue: _selectedMethod,
+                                  onChanged: _isProcessing
+                                      ? null
+                                      : (String? value) {
+                                          if (value != null) {
+                                            setState(() => _selectedMethod = value);
+                                          }
+                                        },
+                                ),
+                                Icon(
+                                  Iconsax.mobile,
+                                  color: colorScheme.primary,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: const [
+                                      Text('UPI'),
+                                      Text(
+                                        'Google Pay, PhonePe, etc.',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Bank Transfer Option
+                        InkWell(
+                          onTap: _isProcessing
+                              ? null
+                              : () {
+                                  setState(() => _selectedMethod = 'bank');
+                                },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: _selectedMethod == 'bank'
+                                    ? colorScheme.primary
+                                    : colorScheme.outline,
+                                width: 2,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Radio.adaptive(
+                                  value: 'bank',
+                                  groupValue: _selectedMethod,
+                                  onChanged: _isProcessing
+                                      ? null
+                                      : (String? value) {
+                                          if (value != null) {
+                                            setState(() => _selectedMethod = value);
+                                          }
+                                        },
+                                ),
+                                Icon(Iconsax.bank,
+                                    color: colorScheme.primary),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: const [
+                                      Text('Bank Transfer'),
+                                      Text(
+                                        'Direct to bank account',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // UPI ID Field (conditional)
+                        if (_selectedMethod == 'upi') ...[
+                          Text(
+                            'UPI ID',
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _upiController,
+                            enabled: !_isProcessing,
+                            decoration: InputDecoration(
+                              hintText: 'yourname@upi',
+                              prefixIcon: const Icon(Iconsax.sms),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ] else ...[
+                          // Bank Details Placeholder
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Bank details form coming soon',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
 
-                // Submit Button
+                // ========== SUBMIT BUTTON ==========
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: isProcessing || userCoins < minimumWithdrawal
+                    onPressed: _isProcessing
                         ? null
-                        : () => _processWithdrawal(userProvider),
-                    icon: const Icon(Icons.send),
-                    label: const Text('Request Withdrawal'),
+                        : () => _submitWithdrawal(userProvider),
+                    icon: const Icon(Iconsax.send_1),
+                    label: const Text('REQUEST WITHDRAWAL'),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
@@ -334,13 +365,82 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Help Text
+                // ========== INFO BOX ==========
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.tertiaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Iconsax.info_circle,
+                            color: colorScheme.tertiary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Processing Time',
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        color: colorScheme.tertiary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                                Text(
+                                  '24-48 hours',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // ========== RECENT WITHDRAWALS ==========
                 Text(
-                  'Please ensure all details are correct before submitting.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                  'Recent Withdrawals',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  elevation: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _buildWithdrawalItem(
+                          context,
+                          amount: '₹500',
+                          method: 'UPI (yourname@upi)',
+                          date: '12 Jan 2025',
+                          status: 'Completed',
+                          statusColor: colorScheme.tertiary,
+                        ),
+                        const SizedBox(height: 12),
+                        Divider(color: colorScheme.outline.withAlpha(77)),
+                        const SizedBox(height: 12),
+                        _buildWithdrawalItem(
+                          context,
+                          amount: '₹1,000',
+                          method: 'UPI (yourname@upi)',
+                          date: '05 Jan 2025',
+                          status: 'Completed',
+                          statusColor: colorScheme.tertiary,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
               ],
@@ -351,16 +451,48 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     );
   }
 
-  IconData _getPaymentIcon() {
-    switch (selectedMethod) {
-      case 'UPI':
-        return Icons.qr_code;
-      case 'Bank Transfer':
-        return Icons.account_balance;
-      case 'PayPal':
-        return Icons.payment;
-      default:
-        return Icons.payment;
-    }
+  Widget _buildWithdrawalItem(
+    BuildContext context, {
+    required String amount,
+    required String method,
+    required String date,
+    required String status,
+    required Color statusColor,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              amount,
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(method, style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 4),
+            Text(date, style: Theme.of(context).textTheme.labelSmall),
+          ],
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: statusColor.withAlpha(51),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            status,
+            style: TextStyle(
+              color: statusColor,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

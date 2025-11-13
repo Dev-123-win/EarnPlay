@@ -9,6 +9,11 @@ class UserData {
   String email;
   String displayName;
   DateTime createdAt;
+  int totalGamesWon;
+  int totalAdsWatched;
+  int totalReferrals;
+  int totalSpins;
+  String? referredBy;
 
   UserData({
     required this.uid,
@@ -21,6 +26,11 @@ class UserData {
     required this.email,
     required this.displayName,
     required this.createdAt,
+    this.totalGamesWon = 0,
+    this.totalAdsWatched = 0,
+    this.totalReferrals = 0,
+    this.totalSpins = 0,
+    this.referredBy,
   });
 
   factory UserData.fromMap(Map<String, dynamic> map) {
@@ -39,6 +49,11 @@ class UserData {
       createdAt: map['createdAt'] != null
           ? DateTime.parse(map['createdAt'].toString())
           : DateTime.now(),
+      totalGamesWon: map['totalGamesWon'] ?? 0,
+      totalAdsWatched: map['totalAdsWatched'] ?? 0,
+      totalReferrals: map['totalReferrals'] ?? 0,
+      totalSpins: map['totalSpins'] ?? 0,
+      referredBy: map['referredBy']?.toString(),
     );
   }
 
@@ -54,6 +69,11 @@ class UserData {
       'email': email,
       'displayName': displayName,
       'createdAt': createdAt.toIso8601String(),
+      'totalGamesWon': totalGamesWon,
+      'totalAdsWatched': totalAdsWatched,
+      'totalReferrals': totalReferrals,
+      'totalSpins': totalSpins,
+      'referredBy': referredBy,
     };
   }
 }

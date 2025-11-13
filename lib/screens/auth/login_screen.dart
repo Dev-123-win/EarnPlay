@@ -130,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen>
             end: Alignment.bottomRight,
             colors: [
               colorScheme.surface,
-              colorScheme.surface.withOpacity(0.95),
+              colorScheme.surface.withValues(alpha: 0.95),
             ],
           ),
         ),
@@ -152,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen>
                         gradient: LinearGradient(
                           colors: [
                             colorScheme.primary,
-                            colorScheme.primary.withOpacity(0.7),
+                            colorScheme.primary.withValues(alpha: 0.7),
                           ],
                         ),
                       ),
@@ -197,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen>
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
-                              color: colorScheme.outline.withOpacity(0.5),
+                              color: colorScheme.outline.withValues(alpha: 0.5),
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
@@ -238,7 +238,7 @@ class _LoginScreenState extends State<LoginScreen>
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
-                              color: colorScheme.outline.withOpacity(0.5),
+                              color: colorScheme.outline.withValues(alpha: 0.5),
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
@@ -324,7 +324,7 @@ class _LoginScreenState extends State<LoginScreen>
                       children: [
                         Expanded(
                           child: Divider(
-                            color: colorScheme.outline.withOpacity(0.5),
+                            color: colorScheme.outline.withValues(alpha: 0.5),
                             thickness: 1,
                           ),
                         ),
@@ -341,7 +341,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         Expanded(
                           child: Divider(
-                            color: colorScheme.outline.withOpacity(0.5),
+                            color: colorScheme.outline.withValues(alpha: 0.5),
                             thickness: 1,
                           ),
                         ),

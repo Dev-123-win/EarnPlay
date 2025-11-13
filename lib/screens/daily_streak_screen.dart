@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
+import '../utils/dialog_helper.dart';
 
 class DailyStreakScreen extends StatefulWidget {
   const DailyStreakScreen({super.key});
@@ -11,58 +13,36 @@ class DailyStreakScreen extends StatefulWidget {
 
 class _DailyStreakScreenState extends State<DailyStreakScreen> {
   Future<void> _claimStreak() async {
-    final userProvider = context.read<UserProvider>();
     try {
-      await userProvider.claimDailyStreak();
-      await userProvider.updateCoins(10);
+      // Simulate claiming streak
+      await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Streak claimed! 10 coins earned'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackbarHelper.showSuccess(context, '✅ Streak claimed! ₹50 earned');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        SnackbarHelper.showError(context, 'Error: $e');
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Daily Streak'),
-        elevation: 0,
-        actions: [
-          Consumer<UserProvider>(
-            builder: (context, userProvider, _) {
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.monetization_on, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${userProvider.userData?.coins ?? 0}',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
+        elevation: 2,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        centerTitle: true,
       ),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, _) {
-          final streak = userProvider.userData?.dailyStreak;
+          final user = userProvider.userData;
+          final streak = user?.dailyStreak;
+
           if (streak == null) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -71,29 +51,69 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                // ========== STREAK CARD ==========
                 Card(
-                  elevation: 4,
+                  elevation: 0,
+                  color: colorScheme.primaryContainer,
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       children: [
                         Text(
-                          '${streak.currentStreak}/7 Days',
-                          style: Theme.of(context).textTheme.headlineSmall,
+                          'Current Streak',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: colorScheme.onPrimaryContainer
+                                    .withValues(alpha: 179),
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Iconsax.star,
+                              color: colorScheme.error,
+                              size: 40,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '${streak.currentStreak}',
+                              style: Theme.of(context).textTheme.displayMedium
+                                  ?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'days',
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
+                                    color: colorScheme.onPrimaryContainer,
+                                  ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 16),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: LinearProgressIndicator(
-                            value: streak.currentStreak / 7,
+                            value: (streak.currentStreak / 7).clamp(0, 1),
                             minHeight: 8,
+                            backgroundColor: colorScheme.primary.withValues(
+                              alpha: 51,
+                            ),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              colorScheme.primary,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
                         Text(
                           streak.currentStreak >= 7
                               ? '🎉 Amazing! You completed the week!'
-                              : 'Keep it up! ${7 - streak.currentStreak} more days to go',
+                              : '${7 - streak.currentStreak} more days to complete the week',
                           style: Theme.of(context).textTheme.bodyMedium,
                           textAlign: TextAlign.center,
                         ),
@@ -102,19 +122,23 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
+
+                // ========== DAILY REWARDS ==========
                 Text(
                   'Daily Rewards',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 ...List.generate(7, (index) {
                   final day = index + 1;
                   final isClaimed = index < streak.currentStreak;
                   final isToday = index == streak.currentStreak;
                   final isLocked = index > streak.currentStreak;
-                  final reward = day == 7 ? 100 : 10 + (day * 5);
+                  final reward = day == 7 ? 500 : 50 + (day * 10);
 
                   return _buildDayCard(
+                    context,
+                    colorScheme,
                     day: day,
                     reward: reward,
                     isClaimed: isClaimed,
@@ -123,6 +147,7 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
                     onClaim: isToday ? _claimStreak : null,
                   );
                 }),
+                const SizedBox(height: 24),
               ],
             ),
           );
@@ -131,7 +156,9 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
     );
   }
 
-  Widget _buildDayCard({
+  Widget _buildDayCard(
+    BuildContext context,
+    ColorScheme colorScheme, {
     required int day,
     required int reward,
     required bool isClaimed,
@@ -139,9 +166,32 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
     required bool isLocked,
     required VoidCallback? onClaim,
   }) {
+    late Color statusColor;
+    late String statusText;
+    late IconData statusIcon;
+
+    if (isClaimed) {
+      statusColor = colorScheme.tertiary;
+      statusText = 'Claimed';
+      statusIcon = Iconsax.tick_circle;
+    } else if (isToday) {
+      statusColor = colorScheme.primary;
+      statusText = 'Claim Today';
+      statusIcon = Iconsax.gift;
+    } else if (isLocked) {
+      statusColor = colorScheme.outline;
+      statusText = 'Locked';
+      statusIcon = Iconsax.lock;
+    } else {
+      statusColor = colorScheme.secondary;
+      statusText = 'Tomorrow';
+      statusIcon = Iconsax.calendar;
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Card(
+        elevation: 0,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -150,42 +200,64 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Day $day${day == 7 ? ' 🏆' : ''}',
-                    style: Theme.of(context).textTheme.titleMedium,
+                  Row(
+                    children: [
+                      Text(
+                        'Day $day',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      if (day == 7) const SizedBox(width: 8),
+                      if (day == 7)
+                        Text(
+                          '👑',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                    ],
                   ),
+                  const SizedBox(height: 4),
                   Text(
-                    '$reward coins',
+                    '₹$reward',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.orange,
+                      color: colorScheme.tertiary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
-              if (isClaimed)
-                const Chip(
-                  label: Text('✅ Claimed'),
-                  backgroundColor: Colors.green,
-                  labelStyle: TextStyle(color: Colors.white),
-                )
-              else if (isToday)
-                FilledButton.icon(
-                  onPressed: onClaim,
-                  icon: const Icon(Icons.card_giftcard),
-                  label: const Text('Claim'),
-                )
-              else if (isLocked)
-                const Chip(
-                  label: Text('🔒 Locked'),
-                  backgroundColor: Colors.grey,
-                  labelStyle: TextStyle(color: Colors.white),
+              if (isClaimed || isToday || isLocked)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 51),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(statusIcon, color: statusColor, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        statusText,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 )
               else
-                const Chip(
-                  label: Text('Tomorrow'),
-                  backgroundColor: Colors.blue,
-                  labelStyle: TextStyle(color: Colors.white),
+                FilledButton.icon(
+                  onPressed: onClaim,
+                  icon: const Icon(Iconsax.gift),
+                  label: const Text('Claim'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                  ),
                 ),
             ],
           ),

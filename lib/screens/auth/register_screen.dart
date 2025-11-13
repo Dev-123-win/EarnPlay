@@ -159,7 +159,7 @@ class _RegisterScreenState extends State<RegisterScreen>
             end: Alignment.bottomRight,
             colors: [
               colorScheme.surface,
-              colorScheme.surface.withOpacity(0.95),
+              colorScheme.surface.withValues(alpha: 242),
             ],
           ),
         ),
@@ -198,7 +198,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
-                              color: colorScheme.outline.withOpacity(0.5),
+                              color: colorScheme.outline.withValues(alpha: 128),
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
@@ -208,6 +208,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                               width: 2,
                             ),
                           ),
+                          labelText: 'Email Address',
                           prefixIcon: Icon(
                             Iconsax.sms,
                             color: colorScheme.primary,
@@ -243,7 +244,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
-                              color: colorScheme.outline.withOpacity(0.5),
+                              color: colorScheme.outline.withValues(alpha: 128),
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
@@ -301,7 +302,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
-                              color: colorScheme.outline.withOpacity(0.5),
+                              color: colorScheme.outline.withValues(alpha: 128),
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
@@ -359,7 +360,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
-                              color: colorScheme.outline.withOpacity(0.5),
+                              color: colorScheme.outline.withValues(alpha: 128),
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(

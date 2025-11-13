@@ -199,3 +199,127 @@ class FadePageRoute extends PageRouteBuilder {
             FadeTransition(opacity: animation, child: child),
       );
 }
+
+/// Shake animation widget
+class ShakeWidget extends StatefulWidget {
+  final Widget child;
+  final Duration duration;
+  final bool trigger;
+
+  const ShakeWidget({
+    super.key,
+    required this.child,
+    this.duration = const Duration(milliseconds: 400),
+    this.trigger = false,
+  });
+
+  @override
+  State<ShakeWidget> createState() => _ShakeWidgetState();
+}
+
+class _ShakeWidgetState extends State<ShakeWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(duration: widget.duration, vsync: this);
+    if (widget.trigger) {
+      _shake();
+    }
+  }
+
+  @override
+  void didUpdateWidget(ShakeWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.trigger && !oldWidget.trigger) {
+      _shake();
+    }
+  }
+
+  void _shake() {
+    _controller.forward(from: 0.0);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final offset =
+            Tween<Offset>(
+              begin: const Offset(-5, 0),
+              end: const Offset(5, 0),
+            ).evaluate(
+              CurvedAnimation(parent: _controller, curve: Curves.elasticInOut),
+            );
+
+        return Transform.translate(offset: offset, child: widget.child);
+      },
+    );
+  }
+}
+
+/// Scale and Fade animation widget (for dialogs)
+class ScaleFadeAnimation extends StatefulWidget {
+  final Widget child;
+  final Duration duration;
+  final bool trigger;
+  final Curve curve;
+
+  const ScaleFadeAnimation({
+    super.key,
+    required this.child,
+    this.duration = const Duration(milliseconds: 500),
+    this.trigger = true,
+    this.curve = Curves.elasticOut,
+  });
+
+  @override
+  State<ScaleFadeAnimation> createState() => _ScaleFadeAnimationState();
+}
+
+class _ScaleFadeAnimationState extends State<ScaleFadeAnimation>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(duration: widget.duration, vsync: this);
+    if (widget.trigger) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _controller.value,
+          child: Transform.scale(
+            scale: Tween<double>(begin: 0, end: 1).evaluate(
+              CurvedAnimation(parent: _controller, curve: widget.curve),
+            ),
+            child: widget.child,
+          ),
+        );
+      },
+    );
+  }
+}

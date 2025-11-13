@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_data_model.dart';
 import '../services/local_storage_service.dart';
 import '../services/firebase_service.dart';
@@ -36,25 +36,30 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  /// Update coins using Cloud Function (secure)
+  /// Update coins using Firestore directly (secure via Firestore rules)
   /// [amount] - positive or negative coin amount
   /// [reason] - why coins are being updated
   Future<void> updateCoins(int amount, {String reason = 'admin_bonus'}) async {
     if (_userData == null) return;
 
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'updateUserCoins',
-      );
-      final result = await callable.call({
-        'uid': _userData!.uid,
+      final uid = _userData!.uid;
+      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+
+      // Record transaction in subcollection
+      await userRef.collection('coin_transactions').add({
         'amount': amount,
         'reason': reason,
+        'timestamp': Timestamp.now(),
       });
 
-      final newBalance = result.data['newBalance'] as int;
-      _userData!.coins = newBalance;
+      // Update user coins
+      await userRef.update({
+        'coins': FieldValue.increment(amount),
+        'lastUpdated': Timestamp.now(),
+      });
 
+      _userData!.coins += amount;
       await LocalStorageService.saveUserData(_userData!);
       notifyListeners();
     } catch (e) {
@@ -64,19 +69,35 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  /// Claim daily streak reward using Cloud Function (secure)
+  /// Claim daily streak reward using Firestore directly (secure via Firestore rules)
   Future<void> claimDailyStreak() async {
     if (_userData == null) return;
 
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'claimDailyStreak',
-      );
-      final result = await callable.call({});
+      final uid = _userData!.uid;
+      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
 
-      _userData!.dailyStreak.currentStreak = result.data['newStreak'] as int;
+      // Increment streak in a transaction to ensure consistency
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final doc = await transaction.get(userRef);
+        final currentData = doc.data() as Map<String, dynamic>;
+
+        final newStreak =
+            ((currentData['dailyStreak']?['currentStreak'] as int?) ?? 0) + 1;
+        final streakReward = newStreak * 10; // 10 coins per day of streak
+
+        transaction.update(userRef, {
+          'dailyStreak.currentStreak': newStreak,
+          'dailyStreak.lastCheckIn': Timestamp.now(),
+          'coins': FieldValue.increment(streakReward),
+          'lastUpdated': Timestamp.now(),
+        });
+      });
+
+      // Update local data
+      _userData!.dailyStreak.currentStreak += 1;
       _userData!.dailyStreak.lastCheckIn = DateTime.now();
-      _userData!.coins = result.data['newBalance'] as int;
+      _userData!.coins += (_userData!.dailyStreak.currentStreak * 10);
 
       await LocalStorageService.saveUserData(_userData!);
       notifyListeners();
@@ -87,32 +108,54 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  /// Request withdrawal using Cloud Function (secure)
+  /// Request withdrawal using Firestore directly (secure via Firestore rules)
   Future<String> requestWithdrawal({
     required int amount,
     required String method,
     required String paymentId,
   }) async {
     if (_userData == null) throw Exception('User not loaded');
+    if (amount < 100) throw Exception('Minimum withdrawal amount is ₹100');
+    if (_userData!.coins < amount) {
+      throw Exception('Insufficient balance for withdrawal');
+    }
 
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'requestWithdrawal',
+      final uid = _userData!.uid;
+      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+      final withdrawalRef = FirebaseFirestore.instance.collection(
+        'withdrawals',
       );
-      final result = await callable.call({
+
+      // Create withdrawal document
+      final withdrawalDoc = await withdrawalRef.add({
+        'userId': uid,
         'amount': amount,
         'method': method,
         'paymentId': paymentId,
+        'status': 'pending',
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
       });
 
-      final newBalance = result.data['newBalance'] as int;
-      final withdrawalId = result.data['withdrawalId'] as String;
+      // Deduct coins from user
+      await userRef.update({
+        'coins': FieldValue.increment(-amount),
+        'lastUpdated': Timestamp.now(),
+      });
 
-      _userData!.coins = newBalance;
+      // Add to withdrawal history
+      await userRef.update({
+        'withdrawalHistory': FieldValue.arrayUnion([
+          {'id': withdrawalDoc.id, 'amount': amount, 'date': Timestamp.now()},
+        ]),
+      });
+
+      _userData!.coins -= amount;
       await LocalStorageService.saveUserData(_userData!);
       notifyListeners();
 
-      return withdrawalId;
+      return withdrawalDoc.id;
     } catch (e) {
       _error = 'Failed to request withdrawal: $e';
       notifyListeners();
@@ -120,20 +163,56 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  /// Process referral bonus using Cloud Function (secure)
+  /// Process referral bonus using Firestore directly (secure via Firestore rules)
   Future<void> processReferral(String referralCode) async {
     if (_userData == null) throw Exception('User not loaded');
+    if (_userData!.referredBy != null) {
+      throw Exception('You have already used a referral code');
+    }
+    if (referralCode == _userData!.referralCode) {
+      throw Exception('Cannot use your own referral code');
+    }
 
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'processReferralBonus',
-      );
-      final result = await callable.call({
-        'referralCode': referralCode,
-        'newUserId': _userData!.uid,
+      final firestore = FirebaseFirestore.instance;
+
+      // Find user with this referral code
+      final referrerQuery = await firestore
+          .collection('users')
+          .where('referralCode', isEqualTo: referralCode)
+          .limit(1)
+          .get();
+
+      if (referrerQuery.docs.isEmpty) {
+        throw Exception('Invalid referral code');
+      }
+
+      final referrerId = referrerQuery.docs.first.id;
+      final referralBonus = 50;
+
+      // Use batch to update both users atomically
+      final batch = firestore.batch();
+
+      final userRef = firestore.collection('users').doc(_userData!.uid);
+      final referrerRef = firestore.collection('users').doc(referrerId);
+
+      // Give bonus to new user
+      batch.update(userRef, {
+        'coins': FieldValue.increment(referralBonus),
+        'referredBy': referralCode,
+        'lastUpdated': Timestamp.now(),
       });
 
-      _userData!.coins = result.data['newUserCoins'] as int;
+      // Give bonus to referrer
+      batch.update(referrerRef, {
+        'coins': FieldValue.increment(referralBonus),
+        'totalReferrals': FieldValue.increment(1),
+        'lastUpdated': Timestamp.now(),
+      });
+
+      await batch.commit();
+
+      _userData!.coins += referralBonus;
       await LocalStorageService.saveUserData(_userData!);
       notifyListeners();
     } catch (e) {
@@ -154,7 +233,7 @@ class UserProvider extends ChangeNotifier {
     if (_userData == null) return;
 
     try {
-  _userData!.watchedAdsToday = _userData!.watchedAdsToday + 1;
+      _userData!.watchedAdsToday = _userData!.watchedAdsToday + 1;
       await LocalStorageService.saveUserData(_userData!);
       // Persist to Firestore
       await FirebaseService().updateUserFields(_userData!.uid, {
@@ -173,7 +252,7 @@ class UserProvider extends ChangeNotifier {
     if (_userData == null) return;
 
     try {
-  _userData!.spinsRemaining = _userData!.spinsRemaining + 1;
+      _userData!.spinsRemaining = _userData!.spinsRemaining + 1;
       await LocalStorageService.saveUserData(_userData!);
       await FirebaseService().updateUserFields(_userData!.uid, {
         'spinsRemaining': _userData!.spinsRemaining,

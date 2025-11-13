@@ -1,196 +1,159 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // ========================================================================
-    // HELPER FUNCTIONS
-    // ========================================================================
-    
-    // Check if user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    // Check if user is owner
-    function isOwner(uid) {
-      return request.auth.uid == uid;
-    }
-    
-    // Check if user is admin
-    function isAdmin() {
-      return isAuthenticated() && request.auth.token.admin == true;
-    }
-    
-    // Check request has valid data structure
-    function hasRequiredFields(required) {
-      return request.resource.data.keys().hasAll(required);
-    }
-    
-    // Validate coin amount
-    function isValidCoinAmount(amount) {
-      return amount is int && amount >= 0 && amount <= 999999;
-    }
 
-    // ========================================================================
+    // ============================================
     // USERS COLLECTION
-    // ========================================================================
-    
-    match /users/{uid} {
-      // Read: Users can read their own profile and public data
-      allow read: if isAuthenticated() && (isOwner(uid) || isAdmin());
-      
-      // Create: Triggered by Cloud Function on auth signup
-      allow create: if isAuthenticated() && isOwner(uid) && 
-        hasRequiredFields(['uid', 'email', 'coins', 'dailyStreak', 'referralCode']) &&
-        request.resource.data.coins == 0 &&
-        request.resource.data.dailyStreak.currentStreak == 0 &&
-        request.resource.data.watchedAdsToday == 0 &&
-        request.resource.data.spinsRemaining == 3;
-      
-      // Update: Only allow specific fields to be updated
-      allow update: if isAuthenticated() && isOwner(uid) &&
-        (
-          // Allow updating coins through Cloud Functions only
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['coins', 'dailyStreak', 'gameStats', 'watchedAdsToday', 'spinsRemaining', 'lastSync', 'lastCoinUpdate', 'lastWithdrawal'])
-        );
-      
-      // Delete: Only admins can delete users (data cleanup)
-      allow delete: if isAdmin();
-      
-      // Subcollection for user statistics
-      match /statistics/{stat} {
-        allow read: if isOwner(uid) || isAdmin();
-        allow write: if isAdmin();
+    // ============================================
+    match /users/{userId} {
+      // Users can only read/write their own document
+      allow read: if request.auth.uid == userId;
+      allow write: if request.auth.uid == userId && 
+                      validateUserDocument(resource.data);
+
+      // Helper function to validate user document structure
+      function validateUserDocument(data) {
+        return data.size() > 0 &&
+               data.keys().hasAll(['uid', 'email', 'displayName', 'coins', 
+                                   'dailyStreak', 'referralCode', 'createdAt']);
+      }
+
+      // Coin Transactions Subcollection
+      match /coin_transactions/{transaction} {
+        allow read: if request.auth.uid == userId;
+        allow write: if request.auth.uid == userId &&
+                        request.resource.data.size() <= 5 &&
+                        request.resource.data.keys().hasAll(['amount', 'reason', 'timestamp']);
+      }
+
+      // Game History Subcollection
+      match /game_history/{gameId} {
+        allow read: if request.auth.uid == userId;
+        allow write: if request.auth.uid == userId &&
+                        validateGameHistory(request.resource.data);
+      }
+
+      // Withdrawal Requests Subcollection
+      match /withdrawal_requests/{withdrawalId} {
+        allow read: if request.auth.uid == userId;
+        allow write: if request.auth.uid == userId &&
+                        validateWithdrawalRequest(request.resource.data);
+      }
+
+      // Action Queue Subcollection (offline actions)
+      match /action_queue/{actionId} {
+        allow read: if request.auth.uid == userId;
+        allow write: if request.auth.uid == userId &&
+                        validateActionQueue(request.resource.data);
       }
     }
 
-    // ========================================================================
-    // COIN TRANSACTIONS COLLECTION
-    // ========================================================================
-    
-    match /coinTransactions/{transactionId} {
-      // Read: Users can read their transactions, admins can read all
-      allow read: if isAuthenticated() && 
-        (isOwner(resource.data.userId) || isAdmin());
-      
-      // Create: Only Cloud Functions can create transactions
-      allow create: if false;
-      
-      // Update: Only admins can update (mark as completed/failed)
-      allow update: if isAdmin() &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'completedAt', 'errorMessage']);
-      
-      // Delete: Disabled
-      allow delete: if false;
-      
-      // Index: userId, timestamp (for querying user's transaction history)
+    // ============================================
+    // REFERRAL CODES COLLECTION
+    // ============================================
+    match /referral_codes/{codeId} {
+      // Anyone can read referral code info
+      allow read: if request.auth != null;
+      // Only system (via transaction) can write
+      allow write: if false; // No direct writes, only via transactions
     }
 
-    // ========================================================================
-    // WITHDRAWALS COLLECTION
-    // ========================================================================
-    
+    // ============================================
+    // WITHDRAWALS COLLECTION (Admin Only for writes)
+    // ============================================
     match /withdrawals/{withdrawalId} {
-      // Read: Users can read their withdrawals, admins can read all
-      allow read: if isAuthenticated() && 
-        (isOwner(resource.data.userId) || isAdmin());
-      
-      // Create: Only Cloud Functions can create withdrawals
-      allow create: if false;
-      
-      // Update: Admins can update status
-      allow update: if isAdmin() &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'completedAt', 'transactionId', 'notes']);
-      
-      // Delete: Disabled
-      allow delete: if false;
-      
-      // Index: userId, status, createdAt (for admin dashboard)
+      // Users can read their own withdrawals
+      allow read: if request.auth != null && 
+                     (request.auth.uid == resource.data.userId || 
+                      isAdmin(request.auth.uid));
+      // Users can create (their own), admins can update status
+      allow create: if request.auth != null && 
+                       request.auth.uid == request.resource.data.userId &&
+                       validateWithdrawalRequest(request.resource.data);
+      allow update: if isAdmin(request.auth.uid) &&
+                       validateWithdrawalUpdate(resource.data, request.resource.data);
     }
 
-    // ========================================================================
-    // GAMES COLLECTION
-    // ========================================================================
-    
-    match /games/{gameId} {
-      // Read: Public game data (leaderboards, game info)
-      allow read: if true;
-      
-      // Write: Only admins
-      allow write: if isAdmin();
+    // ============================================
+    // GAME HISTORY COLLECTION (For analytics/stats)
+    // ============================================
+    match /game_history/{gameId} {
+      // Users can read all games
+      allow read: if request.auth != null;
+      // Only users can create their own game history
+      allow create: if request.auth != null && 
+                       request.auth.uid == request.resource.data.userId &&
+                       validateGameHistory(request.resource.data);
     }
 
-    // ========================================================================
-    // LEADERBOARDS COLLECTION
-    // ========================================================================
-    
-    match /leaderboards/{category}/entries/{userId} {
-      // Read: Public leaderboards
-      allow read: if true;
-      
-      // Write: Only Cloud Functions
+    // ============================================
+    // REFERRAL RECORDS COLLECTION
+    // ============================================
+    match /referral_records/{recordId} {
+      // Users can read their referral records
+      allow read: if request.auth != null &&
+                     (request.auth.uid == resource.data.referrerUserId ||
+                      request.auth.uid == resource.data.referredUserId);
+      // Only system can write
       allow write: if false;
     }
 
-    // ========================================================================
-    // REFERRALS COLLECTION
-    // ========================================================================
-    
-    match /referrals/{referralId} {
-      // Read: Users can read their own, admins can read all
-      allow read: if isAuthenticated() && 
-        (isOwner(resource.data.referrerId) || 
-         isOwner(resource.data.referredUserId) || 
-         isAdmin());
-      
-      // Write: Only Cloud Functions
-      allow write: if false;
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+
+    // Validate Game History Document
+    function validateGameHistory(data) {
+      return data.size() >= 5 &&
+             data.keys().hasAll(['userId', 'gameName', 'isWon', 'coinsEarned', 'playedAt']) &&
+             data.gameName is string &&
+             data.isWon is bool &&
+             data.coinsEarned is number &&
+             data.coinsEarned >= 0 &&
+             data.playedAt is timestamp;
     }
 
-    // ========================================================================
-    // ERROR LOGS COLLECTION
-    // ========================================================================
-    
-    match /errors/{errorId} {
-      // Read: Only admins
-      allow read: if isAdmin();
-      
-      // Write: Cloud Functions only
-      allow write: if false;
+    // Validate Withdrawal Request
+    function validateWithdrawalRequest(data) {
+      return data.size() >= 7 &&
+             data.keys().hasAll(['userId', 'amount', 'paymentMethod', 
+                                'paymentDetails', 'status', 'requestedAt']) &&
+             data.amount is number &&
+             data.amount >= 100 &&
+             data.amount <= 100000 &&
+             (data.paymentMethod == 'UPI' || data.paymentMethod == 'BANK_TRANSFER') &&
+             data.paymentDetails is string &&
+             data.paymentDetails.size() > 0 &&
+             (data.status == 'PENDING' || data.status == 'APPROVED' || data.status == 'REJECTED') &&
+             data.requestedAt is timestamp;
     }
 
-    // ========================================================================
-    // AUDIT LOGS COLLECTION
-    // ========================================================================
-    
-    match /auditLogs/{logId} {
-      // Read: Only admins
-      allow read: if isAdmin();
-      
-      // Write: Cloud Functions only
-      allow write: if false;
+    // Validate Withdrawal Update (for admin approval)
+    function validateWithdrawalUpdate(oldData, newData) {
+      return oldData.status == 'PENDING' &&
+             (newData.status == 'APPROVED' || newData.status == 'REJECTED') &&
+             newData.processedAt is timestamp &&
+             (newData.status == 'REJECTED' ? (newData.rejectionReason is string) : true);
     }
 
-    // ========================================================================
-    // ADMIN CONFIGURATION
-    // ========================================================================
-    
-    match /config/{document=**} {
-      // Read: Authenticated users can read (for client config)
-      allow read: if isAuthenticated();
-      
-      // Write: Only admins
-      allow write: if isAdmin();
+    // Validate Action Queue Item
+    function validateActionQueue(data) {
+      return data.size() >= 5 &&
+             data.keys().hasAll(['userId', 'actionType', 'coinsChange', 'createdAt']) &&
+             (data.actionType == 'GAME_WON' || 
+              data.actionType == 'AD_WATCHED' || 
+              data.actionType == 'SPIN' || 
+              data.actionType == 'REFERRAL_BONUS') &&
+             data.coinsChange is number &&
+             data.createdAt is timestamp;
     }
 
-    // ========================================================================
-    // DEFAULT DENY
-    // ========================================================================
-    
-    // Catch all - deny by default
+    // Check if user is admin
+    function isAdmin(uid) {
+      return get(/databases/$(database)/documents/admins/$(uid)).data.isAdmin == true;
+    }
+
+    // Default deny
     match /{document=**} {
       allow read, write: if false;
     }
