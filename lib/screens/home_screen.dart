@@ -8,6 +8,7 @@ import '../services/firebase_service.dart';
 import '../services/ad_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/dialog_helper.dart';
+import '../utils/currency_helper.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -191,9 +192,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       ).textTheme.bodySmall,
                                     ),
                                     const SizedBox(height: 8),
-                                    Text(
-                                      '₹${userProvider.userData!.coins}',
-                                      style: Theme.of(context)
+                                    CurrencyDisplay(
+                                      amount: '${userProvider.userData!.coins}',
+                                      coinSize: 32,
+                                      spacing: 8,
+                                      textStyle: Theme.of(context)
                                           .textTheme
                                           .headlineLarge
                                           ?.copyWith(
@@ -368,7 +371,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        'Earn ₹500/friend',
+                                        'Earn 500/friend',
                                         style: Theme.of(
                                           context,
                                         ).textTheme.bodySmall,

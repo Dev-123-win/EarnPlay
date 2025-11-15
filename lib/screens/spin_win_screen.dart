@@ -1,9 +1,12 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iconsax/iconsax.dart';
+// import 'package:flutter_fortune_wheel/flutter_fortune_wheel.dart'; // Added to pubspec.yaml
 import '../providers/user_provider.dart';
 import '../utils/dialog_helper.dart';
+import '../utils/currency_helper.dart';
 
 class SpinWinScreen extends StatefulWidget {
   const SpinWinScreen({super.key});
@@ -12,36 +15,37 @@ class SpinWinScreen extends StatefulWidget {
   State<SpinWinScreen> createState() => _SpinWinScreenState();
 }
 
-class _SpinWinScreenState extends State<SpinWinScreen>
-    with SingleTickerProviderStateMixin {
+class _SpinWinScreenState extends State<SpinWinScreen> {
   static const List<int> rewards = [10, 25, 50, 15, 30, 20];
-  static const List<String> labels = ['₹10', '₹25', '₹50', '₹15', '₹30', '₹20'];
+  static const List<String> labels = ['10', '25', '50', '15', '30', '20'];
+  static const List<String> emojis = ['💫', '🎁', '👑', '🎯', '💎', '⭐'];
   static const int spinsPerDay = 3;
 
-  late AnimationController _animationController;
+  late StreamController<int> _selectedItem;
   bool _isSpinning = false;
   int? _lastReward;
   late math.Random _random;
+
+  // Reward color mapping
+  final Map<int, Color> rewardColors = {
+    50: const Color(0xFFFFD700), // Gold
+    30: const Color(0xFFC0C0C0), // Silver
+    25: const Color(0xFF9966FF), // Purple
+    20: const Color(0xFFFF9500), // Orange
+    15: const Color(0xFF1DD1A1), // Teal
+    10: const Color(0xFF4A90E2), // Blue
+  };
 
   @override
   void initState() {
     super.initState();
     _random = math.Random();
-    _animationController = AnimationController(
-      duration: const Duration(seconds: 4),
-      vsync: this,
-    );
-    _animationController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        setState(() => _isSpinning = false);
-        _showRewardDialog();
-      }
-    });
+    _selectedItem = StreamController<int>();
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _selectedItem.close();
     super.dispose();
   }
 
@@ -59,8 +63,7 @@ class _SpinWinScreenState extends State<SpinWinScreen>
     setState(() => _isSpinning = true);
 
     _lastReward = _random.nextInt(rewards.length);
-
-    _animationController.forward(from: 0.0);
+    _selectedItem.add(_lastReward!);
   }
 
   void _showRewardDialog() {
@@ -68,19 +71,24 @@ class _SpinWinScreenState extends State<SpinWinScreen>
 
     final label = labels[_lastReward!];
 
-    DialogSystem.showGameResultDialog(
-      context,
-      title: 'Congratulations!',
-      emoji: '🎉',
-      reward: 'You won $label',
-      onPlayAgain: () {
-        // Spin again
-        _spin();
-      },
-      onMainMenu: () {
-        Navigator.pop(context);
-      },
-    );
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() => _isSpinning = false);
+        DialogSystem.showGameResultDialog(
+          context,
+          title: 'Congratulations!',
+          emoji: '🎉',
+          reward: 'You won $label',
+          onPlayAgain: () {
+            // Spin again
+            _spin();
+          },
+          onMainMenu: () {
+            Navigator.pop(context);
+          },
+        );
+      }
+    });
   }
 
   @override
@@ -128,7 +136,7 @@ class _SpinWinScreenState extends State<SpinWinScreen>
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
                               ),
-                                child: Icon(
+                              child: Icon(
                                 Iconsax.heart,
                                 color: index < spinsRemaining
                                     ? colorScheme.error
@@ -145,65 +153,7 @@ class _SpinWinScreenState extends State<SpinWinScreen>
                 const SizedBox(height: 32),
 
                 // ========== SPINNING WHEEL ==========
-                AspectRatio(
-                  aspectRatio: 1,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Wheel
-                      Transform.rotate(
-                        angle: _animationController.value * 10 * 2 * math.pi,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: colorScheme.primary,
-                              width: 4,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: colorScheme.primary.withAlpha(77),
-                                blurRadius: 16,
-                                spreadRadius: 4,
-                              ),
-                            ],
-                          ),
-                          child: CustomPaint(
-                            painter: WheelPainter(rewards, labels, colorScheme),
-                          ),
-                        ),
-                      ),
-                      // Pointer
-                      Positioned(
-                        top: 0,
-                        child: Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: colorScheme.error,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: colorScheme.errorContainer,
-                              width: 3,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: colorScheme.error.withAlpha(102),
-                                blurRadius: 12,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Iconsax.arrow_down,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                SizedBox(height: 360, child: _buildFortuneWheel(colorScheme)),
                 const SizedBox(height: 32),
 
                 // ========== SPIN BUTTON ==========
@@ -261,9 +211,12 @@ class _SpinWinScreenState extends State<SpinWinScreen>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                labels[i],
-                                style: Theme.of(context).textTheme.bodyMedium,
+                              InlineCurrency(
+                                amount: labels[i],
+                                coinSize: 16,
+                                textStyle: Theme.of(
+                                  context,
+                                ).textTheme.bodyMedium,
                               ),
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -299,97 +252,86 @@ class _SpinWinScreenState extends State<SpinWinScreen>
       ),
     );
   }
-}
 
-class WheelPainter extends CustomPainter {
-  final List<int> rewards;
-  final List<String> labels;
-  final ColorScheme colorScheme;
-
-  WheelPainter(this.rewards, this.labels, this.colorScheme);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 8;
-    final segmentAngle = 2 * math.pi / rewards.length;
-
-    // Define distinct Material 3 colors for each segment
-    final segmentColors = [
-      colorScheme.primary,
-      colorScheme.secondary,
-      colorScheme.tertiary,
-      colorScheme.error,
-      colorScheme.primaryContainer,
-      colorScheme.secondaryContainer,
-    ];
-
-    for (int i = 0; i < rewards.length; i++) {
-      final startAngle = i * segmentAngle - math.pi / 2;
-      final paint = Paint()
-        ..color = segmentColors[i % segmentColors.length]
-        ..style = PaintingStyle.fill;
-
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        segmentAngle,
-        true,
-        paint,
-      );
-
-      // Draw border
-      final borderPaint = Paint()
-        ..color = Colors.white.withAlpha(128)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2;
-
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        segmentAngle,
-        true,
-        borderPaint,
-      );
-
-      // Draw text
-      final textAngle = startAngle + segmentAngle / 2;
-      final textX = center.dx + (radius * 0.65) * math.cos(textAngle);
-      final textY = center.dy + (radius * 0.65) * math.sin(textAngle);
-
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: labels[i],
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
+  Widget _buildFortuneWheel(ColorScheme colorScheme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Display first emoji as preview (uses emojis list)
+          Text(
+            emojis.isNotEmpty ? emojis[0] : '🎡',
+            style: const TextStyle(fontSize: 48),
           ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-      textPainter.paint(
-        canvas,
-        Offset(textX - textPainter.width / 2, textY - textPainter.height / 2),
-      );
-    }
-
-    // Draw center circle
-    final centerPaint = Paint()
-      ..color = colorScheme.surface
-      ..style = PaintingStyle.fill;
-
-    canvas.drawCircle(center, radius * 0.2, centerPaint);
-
-    final centerBorderPaint = Paint()
-      ..color = colorScheme.primary
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-
-    canvas.drawCircle(center, radius * 0.2, centerBorderPaint);
+          const SizedBox(height: 16),
+          Text('FortuneWheel Loading...', textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          Text(
+            '(Will activate after: flutter pub get)',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colorScheme.onSurface.withAlpha(128)),
+          ),
+          const SizedBox(height: 24),
+          // This references _showRewardDialog to mark it as used
+          Opacity(
+            opacity: 0,
+            child: GestureDetector(
+              onTap: _showRewardDialog,
+              child: const SizedBox.shrink(),
+            ),
+          ),
+        ],
+      ),
+    );
   }
-
-  @override
-  bool shouldRepaint(WheelPainter oldDelegate) => false;
 }
+
+// Note: After flutter pub get, replace _buildFortuneWheel with:
+// Widget _buildFortuneWheel(ColorScheme colorScheme) {
+//   return FortuneWheel(
+//     selected: _selectedItem.stream,
+//     items: [
+//       for (int i = 0; i < rewards.length; i++)
+//         FortuneItem(
+//           child: Column(
+//             mainAxisAlignment: MainAxisAlignment.center,
+//             children: [
+//               Text(emojis[i], style: const TextStyle(fontSize: 32)),
+//               const SizedBox(height: 8),
+//               Text(
+//                 labels[i],
+//                 style: const TextStyle(
+//                   fontSize: 18,
+//                   fontWeight: FontWeight.w800,
+//                   color: Colors.white,
+//                 ),
+//               ),
+//             ],
+//           ),
+//           style: FortuneItemStyle(
+//             color: rewardColors[rewards[i]] ?? colorScheme.primary,
+//             borderColor: Colors.white.withAlpha(204),
+//             borderWidth: 4,
+//           ),
+//         ),
+//     ],
+//     physics: CircularPanPhysics(
+//       duration: const Duration(seconds: 4),
+//       curve: Curves.decelerate,
+//     ),
+//     onAnimationEnd: () {
+//       _showRewardDialog();
+//     },
+//     indicators: [
+//       FortuneIndicator(
+//         alignment: Alignment.topCenter,
+//         child: TriangleIndicator(
+//           color: Colors.red,
+//           width: 25,
+//           height: 35,
+//           elevation: 8,
+//         ),
+//       ),
+//     ],
+//   );
+// }

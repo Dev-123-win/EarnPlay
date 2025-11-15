@@ -79,6 +79,11 @@ class _TicTacToeScreenState extends State<TicTacToeScreen> {
   }
 
   int _findBestMove() {
+    // Reduced difficulty: 50% chance of random move, 50% chance of using Minimax
+    if (DateTime.now().millisecond % 2 == 0) {
+      return _findRandomMove();
+    }
+
     // Minimax algorithm
     int bestScore = -1000;
     int bestMove = -1;
@@ -295,7 +300,9 @@ class _TicTacToeScreenState extends State<TicTacToeScreen> {
                       ),
                       Divider(
                         thickness: 2,
-                        color: colorScheme.onPrimaryContainer.withValues(alpha: 51),
+                        color: colorScheme.onPrimaryContainer.withValues(
+                          alpha: 51,
+                        ),
                       ),
                       _buildScoreDisplay(
                         label: 'AI',

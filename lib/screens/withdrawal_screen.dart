@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
 import '../utils/dialog_helper.dart';
+import '../utils/currency_helper.dart';
 
 class WithdrawalScreen extends StatefulWidget {
   const WithdrawalScreen({super.key});
@@ -46,7 +47,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     final user = userProvider.userData;
 
     if (amount < 500) {
-      SnackbarHelper.showError(context, 'Minimum withdrawal is ₹500');
+      SnackbarHelper.showError(context, 'Minimum withdrawal is 500');
       return;
     }
 
@@ -65,7 +66,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
         DialogSystem.showWithdrawalDialog(
           context,
           status: 'Pending',
-          amount: '₹$amount',
+          amount: '$amount',
           message:
               'Your withdrawal request has been submitted.\nYou will receive the amount within 24-48 hours.',
           onClose: () {
@@ -121,14 +122,17 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                           'Available Balance',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
-                                color: colorScheme.onPrimaryContainer
-                                    .withAlpha(178),
+                                color: colorScheme.onPrimaryContainer.withAlpha(
+                                  178,
+                                ),
                               ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          '₹${user.coins}',
-                          style: Theme.of(context).textTheme.displaySmall
+                        CurrencyDisplay(
+                          amount: '${user.coins}',
+                          coinSize: 28,
+                          spacing: 8,
+                          textStyle: Theme.of(context).textTheme.displaySmall
                               ?.copyWith(
                                 color: colorScheme.primary,
                                 fontWeight: FontWeight.bold,
@@ -145,7 +149,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            'Min. withdrawal: ₹500',
+                            'Min. withdrawal: 500',
                             style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(color: colorScheme.primary),
                           ),
@@ -180,7 +184,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                           enabled: !_isProcessing,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            hintText: 'Enter amount (₹)',
+                            hintText: 'Enter amount',
                             prefixIcon: const Icon(Iconsax.coin),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -206,7 +210,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               border: Border.all(
                                 color: _selectedMethod == 'upi'
@@ -225,7 +231,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                       ? null
                                       : (String? value) {
                                           if (value != null) {
-                                            setState(() => _selectedMethod = value);
+                                            setState(
+                                              () => _selectedMethod = value,
+                                            );
                                           }
                                         },
                                 ),
@@ -263,7 +271,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               border: Border.all(
                                 color: _selectedMethod == 'bank'
@@ -282,12 +292,13 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                       ? null
                                       : (String? value) {
                                           if (value != null) {
-                                            setState(() => _selectedMethod = value);
+                                            setState(
+                                              () => _selectedMethod = value,
+                                            );
                                           }
                                         },
                                 ),
-                                Icon(Iconsax.bank,
-                                    color: colorScheme.primary),
+                                Icon(Iconsax.bank, color: colorScheme.primary),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
@@ -421,7 +432,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                       children: [
                         _buildWithdrawalItem(
                           context,
-                          amount: '₹500',
+                          amount: '500',
                           method: 'UPI (yourname@upi)',
                           date: '12 Jan 2025',
                           status: 'Completed',
@@ -432,7 +443,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                         const SizedBox(height: 12),
                         _buildWithdrawalItem(
                           context,
-                          amount: '₹1,000',
+                          amount: '1000',
                           method: 'UPI (yourname@upi)',
                           date: '05 Jan 2025',
                           status: 'Completed',

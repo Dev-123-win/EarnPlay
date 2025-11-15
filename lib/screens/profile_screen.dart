@@ -4,6 +4,7 @@ import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
 import '../services/firebase_service.dart';
 import '../utils/dialog_helper.dart';
+import '../utils/currency_helper.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -117,8 +118,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           user.email,
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
-                                color: colorScheme.onPrimaryContainer
-                                    .withAlpha(178),
+                                color: colorScheme.onPrimaryContainer.withAlpha(
+                                  178,
+                                ),
                               ),
                         ),
                         const SizedBox(height: 4),
@@ -160,9 +162,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  '₹${user.coins}',
-                                  style: Theme.of(context).textTheme.titleLarge
+                                CurrencyDisplay(
+                                  amount: '${user.coins}',
+                                  coinSize: 20,
+                                  spacing: 4,
+                                  textStyle: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
                                       ?.copyWith(
                                         color: colorScheme.secondary,
                                         fontWeight: FontWeight.bold,

@@ -159,7 +159,7 @@ class _RegisterScreenState extends State<RegisterScreen>
             end: Alignment.bottomRight,
             colors: [
               colorScheme.surface,
-              colorScheme.surface.withValues(alpha: 242),
+              colorScheme.surface.withValues(alpha: 0.95),
             ],
           ),
         ),

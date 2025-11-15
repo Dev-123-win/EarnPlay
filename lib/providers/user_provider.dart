@@ -135,7 +135,7 @@ class UserProvider extends ChangeNotifier {
     required String paymentId,
   }) async {
     if (_userData == null) throw Exception('User not loaded');
-    if (amount < 100) throw Exception('Minimum withdrawal amount is ₹100');
+    if (amount < 100) throw Exception('Minimum withdrawal amount is 100');
     if (_userData!.coins < amount) {
       throw Exception('Insufficient balance for withdrawal');
     }

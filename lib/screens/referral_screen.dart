@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
 import '../utils/dialog_helper.dart';
+import '../utils/currency_helper.dart';
 
 class ReferralScreen extends StatefulWidget {
   const ReferralScreen({super.key});
@@ -43,7 +44,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
       if (mounted) {
         SnackbarHelper.showSuccess(
           context,
-          'Referral code claimed! You earned ₹50',
+          'Referral code claimed! You earned 50',
         );
         _claimController.clear();
       }
@@ -205,9 +206,13 @@ class _ReferralScreenState extends State<ReferralScreen> {
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  '₹${user.totalReferrals * 500}',
-                                  style: Theme.of(context).textTheme.titleLarge
+                                CurrencyDisplay(
+                                  amount: '${user.totalReferrals * 500}',
+                                  coinSize: 20,
+                                  spacing: 4,
+                                  textStyle: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
                                       ?.copyWith(
                                         color: colorScheme.tertiary,
                                         fontWeight: FontWeight.bold,
@@ -291,7 +296,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Earn ₹500 for each friend who signs up with your code!',
+                          'Earn 500 for each friend who signs up with your code!',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),

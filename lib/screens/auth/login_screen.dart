@@ -374,38 +374,41 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       ),
                     ),
-                    SizedBox(height: isMobile ? 20 : 28),
+                    SizedBox(height: isMobile ? 24 : 32),
                     // Sign Up Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Don't have an account? ",
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
-                        ),
-                        TextButton(
-                          onPressed: _isLoading
-                              ? null
-                              : () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const RegisterScreen(),
-                                    ),
-                                  );
-                                },
-                          child: Text(
-                            'Register',
-                            style: TextStyle(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w700,
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            "Don't have an account? ",
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
+                          ),
+                          TextButton(
+                            onPressed: _isLoading
+                                ? null
+                                : () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const RegisterScreen(),
+                                      ),
+                                    );
+                                  },
+                            child: Text(
+                              'Register',
+                              style: TextStyle(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    SizedBox(height: isMobile ? 16 : 24),
+                    SizedBox(height: isMobile ? 24 : 32),
                   ],
                 ),
               ),

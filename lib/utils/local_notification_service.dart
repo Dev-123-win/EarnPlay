@@ -70,8 +70,7 @@ class LocalNotificationService {
   void showWithdrawalApproved(int amount, String method) {
     showNotification(
       title: 'Withdrawal Approved! 💰',
-      body:
-          '₹${(amount * 0.5).toStringAsFixed(0)} will be credited via $method',
+      body: '${(amount * 0.5).toStringAsFixed(0)} will be credited via $method',
       payload: 'withdrawal_approved',
     );
   }
