@@ -149,6 +149,15 @@ class FirebaseService {
 
   // Helper Methods
   String _generateReferralCode() {
+    final user = _auth.currentUser;
+    if (user != null) {
+      // Use user UID + timestamp to guarantee uniqueness
+      final uid = user.uid.substring(0, 4).toUpperCase();
+      final timestamp = DateTime.now().millisecondsSinceEpoch
+          .toString()
+          .substring(7, 13);
+      return 'REF$uid$timestamp';
+    }
     return 'REF${DateTime.now().millisecondsSinceEpoch.toString().substring(0, 8)}';
   }
 

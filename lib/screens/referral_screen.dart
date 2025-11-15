@@ -37,14 +37,19 @@ class _ReferralScreenState extends State<ReferralScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await Future.delayed(const Duration(seconds: 1));
+      await context.read<UserProvider>().processReferral(
+        _claimController.text.trim(),
+      );
       if (mounted) {
-        SnackbarHelper.showSuccess(context, 'Referral code claimed!');
+        SnackbarHelper.showSuccess(
+          context,
+          'Referral code claimed! You earned ₹50',
+        );
         _claimController.clear();
       }
     } catch (e) {
       if (mounted) {
-        SnackbarHelper.showError(context, 'Error: $e');
+        SnackbarHelper.showError(context, 'Error: ${e.toString()}');
       }
     } finally {
       if (mounted) {

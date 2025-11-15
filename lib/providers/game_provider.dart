@@ -9,6 +9,7 @@ class GameProvider extends ChangeNotifier {
   int _whackMoleCurrentScore = 0;
   bool _isGameActive = false;
   String? _error;
+  bool _statsLoaded = false;
 
   int get tictactoeWins => _tictactoeWins;
   int get tictactoeLosses => _tictactoeLosses;
@@ -16,6 +17,43 @@ class GameProvider extends ChangeNotifier {
   int get whackMoleCurrentScore => _whackMoleCurrentScore;
   bool get isGameActive => _isGameActive;
   String? get error => _error;
+  bool get statsLoaded => _statsLoaded;
+
+  /// Load game stats from Firestore subcollections
+  Future<void> loadGameStats(String uid) async {
+    try {
+      final tictactoeRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('game_stats')
+          .doc('tictactoe');
+      final whackMoleRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('game_stats')
+          .doc('whack_mole');
+
+      final tictactoeSnap = await tictactoeRef.get();
+      final whackMoleSnap = await whackMoleRef.get();
+
+      if (tictactoeSnap.exists) {
+        _tictactoeWins = tictactoeSnap['wins'] ?? 0;
+        _tictactoeLosses = tictactoeSnap['losses'] ?? 0;
+      }
+
+      if (whackMoleSnap.exists) {
+        _whackMoleHighScore = whackMoleSnap['highScore'] ?? 0;
+      }
+
+      _statsLoaded = true;
+      _error = null;
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to load game stats: $e';
+      _statsLoaded = true;
+      notifyListeners();
+    }
+  }
 
   /// Record Tic-Tac-Toe win and update Firestore directly (secure via Firestore rules)
   Future<int> recordTictactoeWin({int reward = 50}) async {

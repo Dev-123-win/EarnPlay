@@ -17,6 +17,7 @@ void main() async {
     await initializeAdMob();
   } catch (e) {
     debugPrint('AdMob initialization error: $e');
+    debugPrint('App will continue without ads');
   }
 
   await LocalStorageService.initialize();

@@ -41,20 +41,45 @@ class UserData {
       spinsRemaining: map['spinsRemaining'] ?? 3,
       watchedAdsToday: map['watchedAdsToday'] ?? 0,
       referralCode: map['referralCode'] ?? '',
-      lastSync: map['lastSync'] != null
-          ? DateTime.parse(map['lastSync'].toString())
-          : DateTime.now(),
+      lastSync: _parseTimestamp(map['lastSync']) ?? DateTime.now(),
       email: map['email'] ?? '',
       displayName: map['displayName'] ?? '',
-      createdAt: map['createdAt'] != null
-          ? DateTime.parse(map['createdAt'].toString())
-          : DateTime.now(),
+      createdAt: _parseTimestamp(map['createdAt']) ?? DateTime.now(),
       totalGamesWon: map['totalGamesWon'] ?? 0,
       totalAdsWatched: map['totalAdsWatched'] ?? 0,
       totalReferrals: map['totalReferrals'] ?? 0,
       totalSpins: map['totalSpins'] ?? 0,
       referredBy: map['referredBy']?.toString(),
     );
+  }
+
+  static DateTime? _parseTimestamp(dynamic timestamp) {
+    if (timestamp == null) return null;
+
+    // Handle Firestore Timestamp objects
+    if (timestamp.runtimeType.toString().contains('Timestamp')) {
+      try {
+        return (timestamp as dynamic).toDate();
+      } catch (e) {
+        return DateTime.now();
+      }
+    }
+
+    // Handle string timestamps
+    if (timestamp is String) {
+      try {
+        return DateTime.parse(timestamp);
+      } catch (e) {
+        return DateTime.now();
+      }
+    }
+
+    // Handle DateTime objects
+    if (timestamp is DateTime) {
+      return timestamp;
+    }
+
+    return DateTime.now();
   }
 
   Map<String, dynamic> toMap() {
@@ -92,11 +117,38 @@ class DailyStreak {
   factory DailyStreak.fromMap(Map<String, dynamic> map) {
     return DailyStreak(
       currentStreak: map['currentStreak'] ?? 0,
-      lastCheckIn: map['lastCheckIn'] != null
-          ? DateTime.parse(map['lastCheckIn'].toString())
-          : null,
+      lastCheckIn: _parseTimestampNullable(map['lastCheckIn']),
       checkInDates: List<String>.from(map['checkInDates'] ?? []),
     );
+  }
+
+  static DateTime? _parseTimestampNullable(dynamic timestamp) {
+    if (timestamp == null) return null;
+
+    // Handle Firestore Timestamp objects
+    if (timestamp.runtimeType.toString().contains('Timestamp')) {
+      try {
+        return (timestamp as dynamic).toDate();
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Handle string timestamps
+    if (timestamp is String) {
+      try {
+        return DateTime.parse(timestamp);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Handle DateTime objects
+    if (timestamp is DateTime) {
+      return timestamp;
+    }
+
+    return null;
   }
 
   Map<String, dynamic> toMap() {

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hive/hive.dart';
 
 /// Offline-first storage system with daily batch sync at 22:00 IST
 class OfflineStorageService {
@@ -114,9 +115,24 @@ class OfflineStorageService {
     await syncNow(userId);
   }
 
-  /// Load queue from Firestore subcollection
+  /// Load queue from Hive cache first, then from Firestore
   Future<void> _loadQueueFromFirestore(String userId) async {
     try {
+      // First, try to load from Hive cache
+      try {
+        final box = await Hive.openBox<Map>('offline_queue_$userId');
+        _localQueue.clear();
+        for (var i = 0; i < box.length; i++) {
+          final data = box.getAt(i);
+          if (data != null) {
+            _localQueue.add(QueuedAction.fromMap(data.cast<String, dynamic>()));
+          }
+        }
+      } catch (e) {
+        // Hive load failed, continue to Firestore
+      }
+
+      // Then, load from Firestore subcollection
       final snapshot = await _firestore
           .collection('users')
           .doc(userId)
@@ -143,10 +159,17 @@ class OfflineStorageService {
     }
   }
 
-  /// Persist local queue to device storage (for future SQLite/Hive implementation)
+  /// Persist local queue to device storage using Hive
   Future<void> _persistLocalQueue(String userId) async {
-    // TODO: Implement SQLite or Hive for persistent local storage
-    // For now, queue is in-memory
+    try {
+      final box = await Hive.openBox<Map>('offline_queue_$userId');
+      await box.clear();
+      for (var i = 0; i < _localQueue.length; i++) {
+        await box.put(i, _localQueue[i].toMap().cast<String, dynamic>());
+      }
+    } catch (e) {
+      // Silently handle persistence errors
+    }
   }
 
   /// Clear all queued actions

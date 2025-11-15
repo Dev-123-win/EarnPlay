@@ -23,13 +23,30 @@ class UserProvider extends ChangeNotifier {
       final data = await firebaseService.getUserData(uid);
 
       if (data != null) {
-        _userData = UserData.fromMap(data);
-        await LocalStorageService.saveUserData(_userData!);
+        try {
+          _userData = UserData.fromMap(data);
+          await LocalStorageService.saveUserData(_userData!);
+          _error = null;
+        } catch (parseError) {
+          _error = 'Error parsing user data: $parseError';
+          // Try to load from local cache as fallback
+          _userData = await LocalStorageService.getUserData();
+          if (_userData == null) {
+            throw Exception(
+              'Failed to parse user data and local cache is empty',
+            );
+          }
+        }
+      } else {
+        _error = 'No user data found';
       }
     } catch (e) {
       _error = 'Failed to load user data: $e';
       // Try to load from local cache
       _userData = await LocalStorageService.getUserData();
+      if (_userData == null) {
+        _error = 'Failed to load user data. Please login again.';
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -69,7 +86,7 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  /// Claim daily streak reward using Firestore directly (secure via Firestore rules)
+  /// Claim daily streak reward using atomic Firestore transaction
   Future<void> claimDailyStreak() async {
     if (_userData == null) return;
 
@@ -77,15 +94,17 @@ class UserProvider extends ChangeNotifier {
       final uid = _userData!.uid;
       final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
 
-      // Increment streak in a transaction to ensure consistency
+      // Use transaction to ensure consistency
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         final doc = await transaction.get(userRef);
         final currentData = doc.data() as Map<String, dynamic>;
 
-        final newStreak =
-            ((currentData['dailyStreak']?['currentStreak'] as int?) ?? 0) + 1;
+        final currentStreak =
+            ((currentData['dailyStreak']?['currentStreak'] as int?) ?? 0);
+        final newStreak = currentStreak + 1;
         final streakReward = newStreak * 10; // 10 coins per day of streak
 
+        // Update in transaction
         transaction.update(userRef, {
           'dailyStreak.currentStreak': newStreak,
           'dailyStreak.lastCheckIn': Timestamp.now(),
@@ -94,10 +113,11 @@ class UserProvider extends ChangeNotifier {
         });
       });
 
-      // Update local data
+      // Update local data with same calculation
       _userData!.dailyStreak.currentStreak += 1;
       _userData!.dailyStreak.lastCheckIn = DateTime.now();
-      _userData!.coins += (_userData!.dailyStreak.currentStreak * 10);
+      final reward = (_userData!.dailyStreak.currentStreak) * 10;
+      _userData!.coins += reward;
 
       await LocalStorageService.saveUserData(_userData!);
       notifyListeners();
@@ -108,7 +128,7 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  /// Request withdrawal using Firestore directly (secure via Firestore rules)
+  /// Request withdrawal using Firestore transaction (atomic operation)
   Future<String> requestWithdrawal({
     required int amount,
     required String method,
@@ -120,47 +140,74 @@ class UserProvider extends ChangeNotifier {
       throw Exception('Insufficient balance for withdrawal');
     }
 
+    // Validate payment details
+    if (method == 'UPI' && !_isValidUPI(paymentId)) {
+      throw Exception('Invalid UPI ID format');
+    }
+    if (method == 'BANK' && !_isValidBankAccount(paymentId)) {
+      throw Exception('Invalid bank account details');
+    }
+
     try {
       final uid = _userData!.uid;
-      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
-      final withdrawalRef = FirebaseFirestore.instance.collection(
-        'withdrawals',
-      );
+      final firestore = FirebaseFirestore.instance;
 
-      // Create withdrawal document
-      final withdrawalDoc = await withdrawalRef.add({
-        'userId': uid,
-        'amount': amount,
-        'method': method,
-        'paymentId': paymentId,
-        'status': 'pending',
-        'createdAt': Timestamp.now(),
-        'updatedAt': Timestamp.now(),
-      });
+      // Use transaction to ensure atomicity
+      final withdrawalId = await firestore.runTransaction((transaction) async {
+        final userRef = firestore.collection('users').doc(uid);
+        final userSnap = await transaction.get(userRef);
+        final currentBalance = userSnap['coins'] ?? 0;
 
-      // Deduct coins from user
-      await userRef.update({
-        'coins': FieldValue.increment(-amount),
-        'lastUpdated': Timestamp.now(),
-      });
+        if (currentBalance < amount) {
+          throw Exception('Insufficient balance for withdrawal');
+        }
 
-      // Add to withdrawal history
-      await userRef.update({
-        'withdrawalHistory': FieldValue.arrayUnion([
-          {'id': withdrawalDoc.id, 'amount': amount, 'date': Timestamp.now()},
-        ]),
+        // Create withdrawal document
+        final withdrawalRef = firestore.collection('withdrawals').doc();
+        transaction.set(withdrawalRef, {
+          'userId': uid,
+          'amount': amount,
+          'method': method,
+          'paymentId': paymentId,
+          'status': 'pending',
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        });
+
+        // Deduct coins from user (atomic)
+        transaction.update(userRef, {
+          'coins': FieldValue.increment(-amount),
+          'withdrawalHistory': FieldValue.arrayUnion([
+            {'id': withdrawalRef.id, 'amount': amount, 'date': Timestamp.now()},
+          ]),
+          'lastUpdated': Timestamp.now(),
+        });
+
+        return withdrawalRef.id;
       });
 
       _userData!.coins -= amount;
       await LocalStorageService.saveUserData(_userData!);
       notifyListeners();
 
-      return withdrawalDoc.id;
+      return withdrawalId;
     } catch (e) {
       _error = 'Failed to request withdrawal: $e';
       notifyListeners();
       rethrow;
     }
+  }
+
+  /// Validate UPI ID format (name@bank)
+  bool _isValidUPI(String upi) {
+    final regex = RegExp(r'^[a-zA-Z0-9.\-_]{3,}@[a-zA-Z]{3,}$');
+    return regex.hasMatch(upi);
+  }
+
+  /// Validate bank account (9-18 digits)
+  bool _isValidBankAccount(String account) {
+    final digits = account.replaceAll(RegExp(r'\D'), '');
+    return digits.length >= 9 && digits.length <= 18;
   }
 
   /// Process referral bonus using Firestore directly (secure via Firestore rules)

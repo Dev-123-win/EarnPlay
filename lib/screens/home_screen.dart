@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
+import '../providers/game_provider.dart';
 import '../services/firebase_service.dart';
 import '../services/ad_service.dart';
 import '../theme/app_theme.dart';
@@ -37,7 +38,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _loadUserData() async {
     final user = FirebaseService().currentUser;
     if (user != null && mounted) {
-      context.read<UserProvider>().loadUserData(user.uid);
+      await context.read<UserProvider>().loadUserData(user.uid);
+      // Load game stats after user data loads
+      if (mounted) {
+        await context.read<GameProvider>().loadGameStats(user.uid);
+      }
     }
   }
 
@@ -124,6 +129,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   Text(
                     'Failed to load user data',
                     style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    userProvider.error ?? 'Please try again',
+                    style: Theme.of(context).textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () {
+                      final user = FirebaseService().currentUser;
+                      if (user != null) {
+                        context.read<UserProvider>().loadUserData(user.uid);
+                      }
+                    },
+                    icon: const Icon(Iconsax.refresh),
+                    label: const Text('Retry'),
                   ),
                 ],
               ),
@@ -377,8 +399,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
-                                          color: colorScheme.tertiary
-                                              .withAlpha(51),
+                                          color: colorScheme.tertiary.withAlpha(
+                                            51,
+                                          ),
                                         ),
                                         child: Icon(
                                           Iconsax.play_circle,
