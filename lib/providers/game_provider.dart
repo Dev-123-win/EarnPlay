@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class GameProvider extends ChangeNotifier {
+  // ============================================
+  // GAME STATS (displayed to user)
+  // ============================================
   int _tictactoeWins = 0;
   int _tictactoeLosses = 0;
   int _whackMoleHighScore = 0;
@@ -11,6 +13,16 @@ class GameProvider extends ChangeNotifier {
   String? _error;
   bool _statsLoaded = false;
 
+  // ============================================
+  // SESSION BATCHING (in-memory accumulation)
+  // Reduces writes from 2 per game to 2 per session
+  // ============================================
+  String? _activeGameSession; // Game type: "tictactoe" or "whack_mole"
+  int _sessionGamesPlayed = 0;
+  int _sessionGamesWon = 0;
+  int _sessionCoinsEarned = 0;
+  DateTime? _lastSessionFlushTime;
+
   int get tictactoeWins => _tictactoeWins;
   int get tictactoeLosses => _tictactoeLosses;
   int get whackMoleHighScore => _whackMoleHighScore;
@@ -18,31 +30,25 @@ class GameProvider extends ChangeNotifier {
   bool get isGameActive => _isGameActive;
   String? get error => _error;
   bool get statsLoaded => _statsLoaded;
+  int get sessionGamesPlayed => _sessionGamesPlayed;
+  int get sessionCoinsEarned => _sessionCoinsEarned;
 
-  /// Load game stats from Firestore subcollections
+  /// Load game stats from Firestore (monthly aggregates)
   Future<void> loadGameStats(String uid) async {
     try {
-      final tictactoeRef = FirebaseFirestore.instance
+      final currentMonth = _getCurrentMonthKey();
+      final monthlyStatsRef = FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
-          .collection('game_stats')
-          .doc('tictactoe');
-      final whackMoleRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('game_stats')
-          .doc('whack_mole');
+          .collection('monthly_stats')
+          .doc(currentMonth);
 
-      final tictactoeSnap = await tictactoeRef.get();
-      final whackMoleSnap = await whackMoleRef.get();
+      final monthlySnap = await monthlyStatsRef.get();
 
-      if (tictactoeSnap.exists) {
-        _tictactoeWins = tictactoeSnap['wins'] ?? 0;
-        _tictactoeLosses = tictactoeSnap['losses'] ?? 0;
-      }
-
-      if (whackMoleSnap.exists) {
-        _whackMoleHighScore = whackMoleSnap['highScore'] ?? 0;
+      if (monthlySnap.exists) {
+        final data = monthlySnap.data() as Map<String, dynamic>;
+        _tictactoeWins = data['tictactoeWins'] ?? 0;
+        _whackMoleHighScore = data['whackMoleHighScore'] ?? 0;
       }
 
       _statsLoaded = true;
@@ -55,92 +61,122 @@ class GameProvider extends ChangeNotifier {
     }
   }
 
-  /// Record Tic-Tac-Toe win and update Firestore directly (secure via Firestore rules)
-  Future<int> recordTictactoeWin({int reward = 50}) async {
-    try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) throw Exception('User not logged in');
-
-      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
-      final gameStatsRef = userRef.collection('game_stats').doc('tictactoe');
-
-      // Update game stats and coins in a batch
-      final batch = FirebaseFirestore.instance.batch();
-
-      // Update user coins
-      batch.update(userRef, {
-        'coins': FieldValue.increment(reward),
-        'lastUpdated': Timestamp.now(),
-      });
-
-      // Update game stats
-      batch.update(gameStatsRef, {
-        'wins': FieldValue.increment(1),
-        'totalScore': FieldValue.increment(100),
-        'updatedAt': Timestamp.now(),
-      });
-
-      await batch.commit();
-
-      _tictactoeWins++;
-      _error = null;
-      notifyListeners();
-
-      return reward; // Return the reward added
-    } catch (e) {
-      _error = 'Failed to record game win: $e';
-      notifyListeners();
-      rethrow;
-    }
-  }
-
-  void recordTicTactoeLoss() {
-    _tictactoeLosses++;
+  /// Start a new game session - called when user opens a game
+  /// Accumulates all game results in memory instead of writing each one
+  void startGameSession(String gameType) {
+    _activeGameSession = gameType;
+    _sessionGamesPlayed = 0;
+    _sessionGamesWon = 0;
+    _sessionCoinsEarned = 0;
+    _lastSessionFlushTime = DateTime.now();
+    _isGameActive = true;
     _error = null;
     notifyListeners();
   }
 
-  /// Record Whack-a-Mole win and update Firestore directly
-  Future<int> recordWhackMoleWin({required int score}) async {
-    final reward = (score / 2).toInt().clamp(5, 100);
+  /// Record a single game result (accumulates in memory only)
+  /// Does NOT write to Firestore - batches until flush
+  /// Call this immediately after each game completes
+  void recordGameResultInSession({
+    required bool isWin,
+    required int coinsEarned,
+  }) {
+    if (_activeGameSession == null) return;
+
+    _sessionGamesPlayed++;
+    if (isWin) {
+      _sessionGamesWon++;
+    }
+    _sessionCoinsEarned += coinsEarned;
+
+    notifyListeners();
+  }
+
+  /// Flush session data to Firestore (batched write)
+  /// Called every 10 games OR when user leaves the game screen
+  /// OR every 5 minutes (auto-save)
+  /// Reduces 20 writes to 2 writes for 10 games
+  Future<void> flushGameSession(String uid) async {
+    if (_activeGameSession == null || _sessionGamesPlayed == 0) {
+      return; // Nothing to flush
+    }
 
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) throw Exception('User not logged in');
-
       final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
-      final gameStatsRef = userRef.collection('game_stats').doc('whack_mole');
+      final currentMonth = _getCurrentMonthKey();
+      final monthlyStatsRef = userRef
+          .collection('monthly_stats')
+          .doc(currentMonth);
+      final auditRef = userRef.collection('actions').doc();
 
-      // Update game stats and coins in a batch
+      // Batch both writes together for atomicity
       final batch = FirebaseFirestore.instance.batch();
 
-      // Update user coins
+      // Write 1: Update user coins and game stats
       batch.update(userRef, {
-        'coins': FieldValue.increment(reward),
-        'lastUpdated': Timestamp.now(),
+        'coins': FieldValue.increment(_sessionCoinsEarned),
+        'lastUpdated': FieldValue.serverTimestamp(),
       });
 
-      // Update game stats
-      batch.update(gameStatsRef, {
-        'plays': FieldValue.increment(1),
-        'highScore': FieldValue.increment(
-          score > _whackMoleHighScore ? score - _whackMoleHighScore : 0,
-        ),
-        'totalScore': FieldValue.increment(score),
-        'updatedAt': Timestamp.now(),
+      // Write 2: Update monthly stats
+      batch.set(monthlyStatsRef, {
+        'month': currentMonth,
+        'gamesPlayed': FieldValue.increment(_sessionGamesPlayed),
+        'gameWins': FieldValue.increment(_sessionGamesWon),
+        'coinsEarned': FieldValue.increment(_sessionCoinsEarned),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // Write 3: Create audit trail for fraud detection
+      batch.set(auditRef, {
+        'type': 'GAME_SESSION_FLUSH',
+        'gameType': _activeGameSession,
+        'gamesPlayed': _sessionGamesPlayed,
+        'gamesWon': _sessionGamesWon,
+        'coinsEarned': _sessionCoinsEarned,
+        'amount': _sessionCoinsEarned,
+        'timestamp': FieldValue.serverTimestamp(),
+        'userId': uid,
       });
 
       await batch.commit();
 
-      updateWhackMoleScore(score);
-      _error = null;
+      // Update local stats
+      _tictactoeWins += _sessionGamesWon;
+      _sessionCoinsEarned = 0;
+      _sessionGamesPlayed = 0;
+      _sessionGamesWon = 0;
+      _lastSessionFlushTime = DateTime.now();
 
-      return reward;
+      _error = null;
+      notifyListeners();
     } catch (e) {
-      _error = 'Failed to record game win: $e';
+      _error = 'Failed to flush game session: $e';
       notifyListeners();
       rethrow;
     }
+  }
+
+  /// Check if session should auto-flush (every 10 games or 5 minutes)
+  bool shouldFlushSession() {
+    if (_sessionGamesPlayed == 0) return false;
+
+    // Flush if 10+ games played
+    if (_sessionGamesPlayed >= 10) return true;
+
+    // Flush if 5+ minutes since last flush
+    final timeSinceLastFlush = DateTime.now().difference(
+      _lastSessionFlushTime ?? DateTime.now(),
+    );
+    if (timeSinceLastFlush.inMinutes >= 5) return true;
+
+    return false;
+  }
+
+  /// Helper: Get current month in format "2025-11"
+  String _getCurrentMonthKey() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}';
   }
 
   void updateWhackMoleScore(int score) {
@@ -159,7 +195,12 @@ class GameProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void endGame() {
+  /// End game session and flush accumulated data to Firestore
+  Future<void> endGameSession(String uid) async {
+    if (shouldFlushSession()) {
+      await flushGameSession(uid);
+    }
+    _activeGameSession = null;
     _isGameActive = false;
     _error = null;
     notifyListeners();
@@ -172,6 +213,10 @@ class GameProvider extends ChangeNotifier {
     _whackMoleCurrentScore = 0;
     _isGameActive = false;
     _error = null;
+    _activeGameSession = null;
+    _sessionGamesPlayed = 0;
+    _sessionGamesWon = 0;
+    _sessionCoinsEarned = 0;
     notifyListeners();
   }
 }

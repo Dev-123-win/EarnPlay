@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:step_progress_indicator/step_progress_indicator.dart';
 import '../providers/user_provider.dart';
@@ -15,11 +16,27 @@ class DailyStreakScreen extends StatefulWidget {
 
 class _DailyStreakScreenState extends State<DailyStreakScreen> {
   late AdService _adService;
+  final Map<int, NativeAd?> _nativeAds = {};
 
   @override
   void initState() {
     super.initState();
     _adService = AdService();
+  }
+
+  void _loadNativeAd(int adIndex) {
+    _adService.loadNativeAd(
+      onAdLoaded: (NativeAd ad) {
+        if (mounted) {
+          setState(() {
+            _nativeAds[adIndex] = ad;
+          });
+        }
+      },
+      onAdFailed: (LoadAdError error) {
+        // print('Native ad failed to load: $error');
+      },
+    );
   }
 
   Future<void> _claimStreak() async {
@@ -39,7 +56,25 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
       }
     } catch (e) {
       if (mounted) {
-        SnackbarHelper.showError(context, 'Error claiming streak: $e');
+        SnackbarHelper.showError(context, '$e');
+      }
+    }
+  }
+
+  Future<void> _resetStreak() async {
+    try {
+      final userProvider = context.read<UserProvider>();
+      await userProvider.resetDailyStreak();
+
+      if (mounted) {
+        SnackbarHelper.showSuccess(
+          context,
+          '🔄 Streak reset! Start a new streak today',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackbarHelper.showError(context, 'Error resetting streak: $e');
       }
     }
   }
@@ -114,7 +149,7 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        // ========== STEP PROGRESS INDICATOR (Example 8 Style) ==========
+                        // ========== STEP PROGRESS INDICATOR WITH HORIZONTAL SCROLL ==========
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -128,71 +163,75 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
                               width: 1,
                             ),
                           ),
-                          child: StepProgressIndicator(
-                            totalSteps: 7,
-                            currentStep: streak.currentStreak.clamp(0, 7),
-                            size: 50,
-                            padding: 8,
-                            selectedColor: const Color(
-                              0xFF1DD1A1,
-                            ), // Green for completed
-                            unselectedColor: colorScheme.primary.withAlpha(
-                              51,
-                            ), // Light purple for pending
-                            roundedEdges: const Radius.circular(12),
-                            customStep: (index, color, _) {
-                              final step = index + 1;
-                              final isCompleted = index < streak.currentStreak;
-                              final isToday = index == streak.currentStreak;
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: StepProgressIndicator(
+                              totalSteps: 7,
+                              currentStep: streak.currentStreak.clamp(0, 7),
+                              size: 50,
+                              padding: 8,
+                              selectedColor: const Color(
+                                0xFF1DD1A1,
+                              ), // Green for completed
+                              unselectedColor: colorScheme.primary.withAlpha(
+                                51,
+                              ), // Light purple for pending
+                              roundedEdges: const Radius.circular(12),
+                              customStep: (index, color, _) {
+                                final step = index + 1;
+                                final isCompleted =
+                                    index < streak.currentStreak;
+                                final isToday = index == streak.currentStreak;
 
-                              return Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  color: isCompleted
-                                      ? const Color(0xFF1DD1A1)
-                                      : (isToday
-                                            ? colorScheme.primary
-                                            : colorScheme.primary.withAlpha(
-                                                51,
-                                              )),
-                                  border: isToday
-                                      ? Border.all(
-                                          color: colorScheme.primary,
-                                          width: 2,
-                                        )
-                                      : null,
-                                  boxShadow: isToday
-                                      ? [
-                                          BoxShadow(
-                                            color: colorScheme.primary
-                                                .withAlpha(76),
-                                            blurRadius: 12,
-                                            spreadRadius: 2,
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: isCompleted
+                                        ? const Color(0xFF1DD1A1)
+                                        : (isToday
+                                              ? colorScheme.primary
+                                              : colorScheme.primary.withAlpha(
+                                                  51,
+                                                )),
+                                    border: isToday
+                                        ? Border.all(
+                                            color: colorScheme.primary,
+                                            width: 2,
+                                          )
+                                        : null,
+                                    boxShadow: isToday
+                                        ? [
+                                            BoxShadow(
+                                              color: colorScheme.primary
+                                                  .withAlpha(76),
+                                              blurRadius: 12,
+                                              spreadRadius: 2,
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  child: Center(
+                                    child: isCompleted
+                                        ? Icon(
+                                            Iconsax.tick_circle,
+                                            size: 24,
+                                            color: Colors.white,
+                                          )
+                                        : Text(
+                                            '$step',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w900,
+                                              color: isToday
+                                                  ? colorScheme.onPrimary
+                                                  : colorScheme.onSurface
+                                                        .withAlpha(128),
+                                            ),
                                           ),
-                                        ]
-                                      : null,
-                                ),
-                                child: Center(
-                                  child: isCompleted
-                                      ? Icon(
-                                          Iconsax.tick_circle,
-                                          size: 24,
-                                          color: Colors.white,
-                                        )
-                                      : Text(
-                                          '$step',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w900,
-                                            color: isToday
-                                                ? colorScheme.onPrimary
-                                                : colorScheme.onSurface
-                                                      .withAlpha(128),
-                                          ),
-                                        ),
-                                ),
-                              );
-                            },
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -237,13 +276,32 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
                       // Show native ad between every 2 cards
                       if ((index + 1) % 2 == 0 && index != 6) ...[
                         const SizedBox(height: 8),
-                        _buildNativeAdPlaceholder(),
+                        _buildNativeAdPlaceholder(index),
                         const SizedBox(height: 8),
                       ],
                     ],
                   );
                 }),
                 const SizedBox(height: 24),
+
+                // ========== RESET BUTTON IF ALL DAYS COMPLETED ==========
+                if (streak.currentStreak >= 7) ...[
+                  Center(
+                    child: FilledButton.icon(
+                      onPressed: _resetStreak,
+                      icon: const Icon(Iconsax.refresh),
+                      label: const Text('Start New Streak'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
               ],
             ),
           );
@@ -263,10 +321,10 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
     required VoidCallback? onClaim,
   }) {
     // Color scheme constants
-    const Color claimedColor = Color(0xFF1DD1A1); // Teal/Green
     const Color tomorrowColor = Color(0xFFFF9500); // Soft Orange
     const Color lockedColor = Color(0xFFB0B0B0); // Muted Gray
     const Color day7Gold = Color(0xFFFFD700); // Gold
+    const Color claimedBlue = Color(0xFF2196F3); // Blue for claimed status
 
     late Color statusColor;
     late String statusText;
@@ -274,7 +332,7 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
     bool isDay7 = day == 7;
 
     if (isClaimed) {
-      statusColor = isDay7 ? day7Gold : claimedColor;
+      statusColor = isDay7 ? day7Gold : claimedBlue;
       statusText = 'Claimed';
       statusIcon = Iconsax.tick_circle;
     } else if (isToday) {
@@ -302,7 +360,8 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
               : BorderSide.none,
         ),
         child: Container(
-          decoration: isDay7 && (isClaimed || isToday)
+          decoration:
+              (isDay7 && (isClaimed || isToday)) || (isClaimed && !isDay7)
               ? BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   gradient: LinearGradient(
@@ -330,7 +389,9 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: isDay7 && (isClaimed || isToday)
+                                color:
+                                    (isDay7 && (isClaimed || isToday)) ||
+                                        (isClaimed && !isDay7)
                                     ? statusColor
                                     : null,
                               ),
@@ -349,8 +410,8 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
                       children: [
                         Image.asset(
                           'coin.png',
-                          width: 16,
-                          height: 16,
+                          width: 18,
+                          height: 18,
                           fit: BoxFit.contain,
                         ),
                         const SizedBox(width: 6),
@@ -409,73 +470,47 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
     );
   }
 
-  Widget _buildNativeAdPlaceholder() {
+  Widget _buildNativeAdPlaceholder(int adIndex) {
+    final nativeAd = _nativeAds[adIndex];
+
+    if (nativeAd == null) {
+      // Load native ad on first build
+      _loadNativeAd(adIndex);
+
+      // Show placeholder while loading
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        padding: const EdgeInsets.all(12),
+        height: 100,
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Show real native ad
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade300),
       ),
       padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.green.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              Icons.local_offer,
-              color: Colors.green.shade700,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Sponsored Offer',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                Text(
-                  'Check special deals for you',
-                  style: Theme.of(context).textTheme.bodySmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.green.shade600,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: const Text(
-              'View',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
+      child: AdWidget(ad: nativeAd),
     );
   }
 
   @override
   void dispose() {
     _adService.disposeBannerAd();
+    // Dispose all native ads
+    for (var ad in _nativeAds.values) {
+      if (ad != null) {
+        _adService.disposeNativeAd(ad);
+      }
+    }
     super.dispose();
   }
 }

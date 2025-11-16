@@ -53,9 +53,10 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  /// Update coins using Firestore directly (secure via Firestore rules)
+  /// Update coins using FieldValue.increment() for atomicity
+  /// Never use direct SET - always increment to prevent race conditions
   /// [amount] - positive or negative coin amount
-  /// [reason] - why coins are being updated
+  /// [reason] - why coins are being updated (for audit trail)
   Future<void> updateCoins(int amount, {String reason = 'admin_bonus'}) async {
     if (_userData == null) return;
 
@@ -63,17 +64,20 @@ class UserProvider extends ChangeNotifier {
       final uid = _userData!.uid;
       final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
 
-      // Record transaction in subcollection
-      await userRef.collection('coin_transactions').add({
-        'amount': amount,
-        'reason': reason,
-        'timestamp': Timestamp.now(),
-      });
-
-      // Update user coins
+      // CRITICAL: Use FieldValue.increment() NOT direct set
+      // This ensures atomicity even with concurrent writes
       await userRef.update({
         'coins': FieldValue.increment(amount),
-        'lastUpdated': Timestamp.now(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+
+      // Create audit trail for fraud detection
+      await userRef.collection('actions').add({
+        'type': 'MANUAL_BONUS',
+        'amount': amount,
+        'reason': reason,
+        'timestamp': FieldValue.serverTimestamp(),
+        'userId': uid,
       });
 
       _userData!.coins += amount;
@@ -86,13 +90,64 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  /// Claim daily streak reward using atomic Firestore transaction
-  Future<void> claimDailyStreak() async {
+  /// Check if streak should be reset (missed a day)
+  bool _shouldResetStreak() {
+    if (_userData?.dailyStreak.lastCheckIn == null) return false;
+
+    final lastCheckIn = _userData!.dailyStreak.lastCheckIn!;
+    final now = DateTime.now();
+    final daysSinceCheckIn = now.difference(lastCheckIn).inDays;
+
+    // Reset if more than 1 day has passed
+    return daysSinceCheckIn > 1;
+  }
+
+  /// Reset daily streak to 0
+  Future<void> resetDailyStreak() async {
     if (_userData == null) return;
 
     try {
       final uid = _userData!.uid;
       final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+
+      await userRef.update({
+        'dailyStreak.currentStreak': 0,
+        'dailyStreak.lastCheckIn': null,
+        'dailyStreak.checkInDates': [],
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+
+      _userData!.dailyStreak.currentStreak = 0;
+      _userData!.dailyStreak.lastCheckIn = null;
+      _userData!.dailyStreak.checkInDates = [];
+
+      await LocalStorageService.saveUserData(_userData!);
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to reset streak: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Claim daily streak reward using atomic Firestore transaction
+  Future<void> claimDailyStreak() async {
+    if (_userData == null) return;
+
+    try {
+      // Check if streak should be reset
+      if (_shouldResetStreak()) {
+        await resetDailyStreak();
+        throw Exception(
+          'Streak was reset due to missed day. Start a new streak!',
+        );
+      }
+
+      final uid = _userData!.uid;
+      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+      final today = DateTime.now();
+      final todayString =
+          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
       // Use transaction to ensure consistency
       await FirebaseFirestore.instance.runTransaction((transaction) async {
@@ -101,21 +156,48 @@ class UserProvider extends ChangeNotifier {
 
         final currentStreak =
             ((currentData['dailyStreak']?['currentStreak'] as int?) ?? 0);
+        final checkInDates = List<String>.from(
+          currentData['dailyStreak']?['checkInDates'] ?? [],
+        );
+
+        // Don't allow double claiming on same day
+        if (checkInDates.contains(todayString)) {
+          throw Exception('You have already claimed today!');
+        }
+
         final newStreak = currentStreak + 1;
         final streakReward = newStreak * 10; // 10 coins per day of streak
+
+        // Add today's date to check-in dates
+        checkInDates.add(todayString);
 
         // Update in transaction
         transaction.update(userRef, {
           'dailyStreak.currentStreak': newStreak,
-          'dailyStreak.lastCheckIn': Timestamp.now(),
+          'dailyStreak.lastCheckIn': FieldValue.serverTimestamp(),
+          'dailyStreak.checkInDates': checkInDates,
           'coins': FieldValue.increment(streakReward),
-          'lastUpdated': Timestamp.now(),
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+
+        // Create audit trail
+        transaction.set(userRef.collection('actions').doc(), {
+          'type': 'DAILY_STREAK_REWARD',
+          'amount': streakReward,
+          'streak': newStreak,
+          'timestamp': FieldValue.serverTimestamp(),
+          'userId': uid,
         });
       });
 
       // Update local data with same calculation
       _userData!.dailyStreak.currentStreak += 1;
       _userData!.dailyStreak.lastCheckIn = DateTime.now();
+      final todayString2 =
+          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      if (!_userData!.dailyStreak.checkInDates.contains(todayString2)) {
+        _userData!.dailyStreak.checkInDates.add(todayString2);
+      }
       final reward = (_userData!.dailyStreak.currentStreak) * 10;
       _userData!.coins += reward;
 
@@ -135,7 +217,7 @@ class UserProvider extends ChangeNotifier {
     required String paymentId,
   }) async {
     if (_userData == null) throw Exception('User not loaded');
-    if (amount < 100) throw Exception('Minimum withdrawal amount is 100');
+    if (amount < 500) throw Exception('Minimum withdrawal amount is 500 coins');
     if (_userData!.coins < amount) {
       throw Exception('Insufficient balance for withdrawal');
     }
@@ -167,20 +249,26 @@ class UserProvider extends ChangeNotifier {
         transaction.set(withdrawalRef, {
           'userId': uid,
           'amount': amount,
-          'method': method,
-          'paymentId': paymentId,
-          'status': 'pending',
-          'createdAt': Timestamp.now(),
-          'updatedAt': Timestamp.now(),
+          'paymentMethod': method,
+          'paymentDetails': paymentId,
+          'status': 'PENDING',
+          'requestedAt': FieldValue.serverTimestamp(),
+          'lastActionTimestamp': FieldValue.serverTimestamp(),
         });
 
         // Deduct coins from user (atomic)
         transaction.update(userRef, {
           'coins': FieldValue.increment(-amount),
-          'withdrawalHistory': FieldValue.arrayUnion([
-            {'id': withdrawalRef.id, 'amount': amount, 'date': Timestamp.now()},
-          ]),
-          'lastUpdated': Timestamp.now(),
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+
+        // Create audit trail for withdrawal
+        transaction.set(userRef.collection('actions').doc(), {
+          'type': 'WITHDRAWAL_REQUEST',
+          'amount': -amount,
+          'withdrawalId': withdrawalRef.id,
+          'timestamp': FieldValue.serverTimestamp(),
+          'userId': uid,
         });
 
         return withdrawalRef.id;
@@ -210,7 +298,8 @@ class UserProvider extends ChangeNotifier {
     return digits.length >= 9 && digits.length <= 18;
   }
 
-  /// Process referral bonus using Firestore directly (secure via Firestore rules)
+  /// Process referral bonus using Firestore transaction (atomic)
+  /// Ensures referrer and new user both get their bonuses or neither does
   Future<void> processReferral(String referralCode) async {
     if (_userData == null) throw Exception('User not loaded');
     if (_userData!.referredBy != null) {
@@ -237,29 +326,55 @@ class UserProvider extends ChangeNotifier {
       final referrerId = referrerQuery.docs.first.id;
       final referralBonus = 50;
 
-      // Use batch to update both users atomically
-      final batch = firestore.batch();
+      // Use transaction for atomicity
+      await firestore.runTransaction((transaction) async {
+        final userRef = firestore.collection('users').doc(_userData!.uid);
+        final referrerRef = firestore.collection('users').doc(referrerId);
 
-      final userRef = firestore.collection('users').doc(_userData!.uid);
-      final referrerRef = firestore.collection('users').doc(referrerId);
+        // Read current state
+        final userSnap = await transaction.get(userRef);
+        final userData = userSnap.data() as Map<String, dynamic>;
 
-      // Give bonus to new user
-      batch.update(userRef, {
-        'coins': FieldValue.increment(referralBonus),
-        'referredBy': referralCode,
-        'lastUpdated': Timestamp.now(),
+        // CRITICAL: Check that referredBy is still null (prevents double-claim)
+        if (userData['referredBy'] != null) {
+          throw Exception('You have already used a referral code');
+        }
+
+        // Give bonus to new user
+        transaction.update(userRef, {
+          'coins': FieldValue.increment(referralBonus),
+          'referredBy': referralCode,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+
+        // Create audit trail for new user
+        transaction.set(userRef.collection('actions').doc(), {
+          'type': 'REFERRAL_BONUS',
+          'amount': referralBonus,
+          'referrerCode': referralCode,
+          'timestamp': FieldValue.serverTimestamp(),
+          'userId': _userData!.uid,
+        });
+
+        // Give bonus to referrer
+        transaction.update(referrerRef, {
+          'coins': FieldValue.increment(referralBonus),
+          'totalReferrals': FieldValue.increment(1),
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+
+        // Create audit trail for referrer
+        transaction.set(referrerRef.collection('actions').doc(), {
+          'type': 'REFERRAL_REWARD',
+          'amount': referralBonus,
+          'referredUserId': _userData!.uid,
+          'timestamp': FieldValue.serverTimestamp(),
+          'userId': referrerId,
+        });
       });
-
-      // Give bonus to referrer
-      batch.update(referrerRef, {
-        'coins': FieldValue.increment(referralBonus),
-        'totalReferrals': FieldValue.increment(1),
-        'lastUpdated': Timestamp.now(),
-      });
-
-      await batch.commit();
 
       _userData!.coins += referralBonus;
+      _userData!.referredBy = referralCode;
       await LocalStorageService.saveUserData(_userData!);
       notifyListeners();
     } catch (e) {
@@ -274,18 +389,37 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Increment watched ads counter locally and persist to Firestore.
-  /// Called after a rewarded ad gives coins.
-  Future<void> incrementWatchedAds() async {
+  /// Increment watched ads counter
+  /// Called after a rewarded ad gives coins
+  /// Uses lazy reset: resets only on new day when first ad is watched
+  Future<void> incrementWatchedAds(int coinsEarned) async {
     if (_userData == null) return;
 
     try {
       _userData!.watchedAdsToday = _userData!.watchedAdsToday + 1;
+      _userData!.totalAdsWatched += 1;
       await LocalStorageService.saveUserData(_userData!);
-      // Persist to Firestore
-      await FirebaseService().updateUserFields(_userData!.uid, {
-        'watchedAdsToday': _userData!.watchedAdsToday,
+
+      final uid = _userData!.uid;
+      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+
+      // Persist to Firestore with coins increment
+      await userRef.update({
+        'watchedAdsToday': FieldValue.increment(1),
+        'lastAdResetDate': FieldValue.serverTimestamp(),
+        'coins': FieldValue.increment(coinsEarned),
+        'lastUpdated': FieldValue.serverTimestamp(),
       });
+
+      // Create audit trail
+      await userRef.collection('actions').add({
+        'type': 'AD_WATCHED',
+        'amount': coinsEarned,
+        'timestamp': FieldValue.serverTimestamp(),
+        'userId': uid,
+      });
+
+      _userData!.coins += coinsEarned;
       notifyListeners();
     } catch (e) {
       _error = 'Failed to increment watched ads: $e';
@@ -294,16 +428,23 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  /// Add a bonus spin to the user's spinsRemaining and persist.
+  /// Add a bonus spin to the user's spinsRemaining
   Future<void> addBonusSpin() async {
     if (_userData == null) return;
 
     try {
       _userData!.spinsRemaining = _userData!.spinsRemaining + 1;
+      _userData!.totalSpins += 1;
       await LocalStorageService.saveUserData(_userData!);
-      await FirebaseService().updateUserFields(_userData!.uid, {
-        'spinsRemaining': _userData!.spinsRemaining,
+
+      final uid = _userData!.uid;
+      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+
+      await userRef.update({
+        'totalSpins': FieldValue.increment(1),
+        'lastUpdated': FieldValue.serverTimestamp(),
       });
+
       notifyListeners();
     } catch (e) {
       _error = 'Failed to add bonus spin: $e';
@@ -313,7 +454,7 @@ class UserProvider extends ChangeNotifier {
   }
 
   /// Claim spin reward with optional ad watch bonus
-  /// Decrements totalSpins and increments coins
+  /// Uses transaction to ensure atomicity
   Future<void> claimSpinReward(int coinAmount, {bool watchedAd = false}) async {
     if (_userData == null) throw Exception('User not loaded');
 
@@ -335,15 +476,17 @@ class UserProvider extends ChangeNotifier {
         transaction.update(userRef, {
           'coins': FieldValue.increment(coinAmount),
           'totalSpins': FieldValue.increment(-1),
-          'lastSpinTime': Timestamp.now(),
-          'lastUpdated': Timestamp.now(),
+          'lastSpinTime': FieldValue.serverTimestamp(),
+          'lastUpdated': FieldValue.serverTimestamp(),
         });
 
-        // Record transaction
-        await userRef.collection('spin_transactions').add({
+        // Create audit trail
+        transaction.set(userRef.collection('actions').doc(), {
+          'type': 'SPIN_REWARD',
           'amount': coinAmount,
           'watchedAd': watchedAd,
-          'timestamp': Timestamp.now(),
+          'timestamp': FieldValue.serverTimestamp(),
+          'userId': uid,
         });
       });
 

@@ -16,6 +16,7 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
   static const int coinsPerAd = 5;
 
   late AdService _adService;
+  final Map<int, NativeAd?> _nativeAds = {};
 
   @override
   void initState() {
@@ -28,6 +29,12 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
   @override
   void dispose() {
     _adService.disposeBannerAd();
+    // Dispose all native ads
+    for (var ad in _nativeAds.values) {
+      if (ad != null) {
+        _adService.disposeNativeAd(ad);
+      }
+    }
     super.dispose();
   }
 
@@ -51,12 +58,9 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
     try {
       bool rewardGiven = await _adService.showRewardedAd(
         onUserEarnedReward: (RewardItem reward) async {
-          // Add coins when reward is earned
+          // Add coins and increment watched ads counter atomically
           try {
-            await userProvider.updateCoins(coinsPerAd);
-
-            // Increment watched ads counter
-            await userProvider.incrementWatchedAds();
+            await userProvider.incrementWatchedAds(coinsPerAd);
 
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -210,7 +214,7 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                         // Show native ad between every 3 cards
                         if ((index + 1) % 3 == 0 && index != remaining - 1) ...[
                           const SizedBox(height: 8),
-                          _buildNativeAdPlaceholder(),
+                          _buildNativeAdPlaceholder(index),
                           const SizedBox(height: 8),
                         ],
                       ],
@@ -323,71 +327,50 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
     );
   }
 
-  Widget _buildNativeAdPlaceholder() {
+  Widget _buildNativeAdPlaceholder(int adIndex) {
+    final nativeAd = _nativeAds[adIndex];
+
+    if (nativeAd == null) {
+      // Load native ad on first build
+      _loadNativeAd(adIndex);
+
+      // Show placeholder while loading
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        padding: const EdgeInsets.all(12),
+        height: 100,
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Show real native ad
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade300),
       ),
       padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.shopping_bag,
-                  color: Colors.blue.shade700,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Sponsored Ad',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    Text(
-                      'Discover amazing offers',
-                      style: Theme.of(context).textTheme.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade600,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'Visit',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+      child: AdWidget(ad: nativeAd),
+    );
+  }
+
+  void _loadNativeAd(int adIndex) {
+    _adService.loadNativeAd(
+      onAdLoaded: (NativeAd ad) {
+        if (mounted) {
+          setState(() {
+            _nativeAds[adIndex] = ad;
+          });
+        }
+      },
+      onAdFailed: (LoadAdError error) {
+        // print('Native ad failed to load: $error');
+      },
     );
   }
 }

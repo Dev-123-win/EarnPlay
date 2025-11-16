@@ -417,6 +417,57 @@ class AdService {
     }
   }
 
+  /// ========== NATIVE ADS ==========
+  /// Load native ad for display in feeds/lists
+  Future<NativeAd?> loadNativeAd({
+    required Function(NativeAd) onAdLoaded,
+    required Function(LoadAdError) onAdFailed,
+  }) async {
+    if (!_isInitialized) await initialize();
+
+    try {
+      final nativeAd = NativeAd(
+        adUnitId: nativeAdvancedAdId,
+        factoryId: 'listTile',
+        request: const AdRequest(),
+        listener: NativeAdListener(
+          onAdLoaded: (ad) {
+            onAdLoaded(ad as NativeAd);
+            // print('✅ Native Ad loaded'); // Removed print
+          },
+          onAdFailedToLoad: (ad, error) {
+            ad.dispose();
+            onAdFailed(error);
+            // print('❌ Native Ad failed to load: $error'); // Removed print
+          },
+          onAdOpened: (ad) {
+            // print('📖 Native Ad opened'); // Removed print
+          },
+          onAdClosed: (ad) {
+            // print('❌ Native Ad closed'); // Removed print
+          },
+          onAdImpression: (ad) {
+            // print('👁️ Native Ad impression'); // Removed print
+          },
+          onAdClicked: (ad) {
+            // print('👆 Native Ad clicked'); // Removed print
+          },
+        ),
+      );
+
+      await nativeAd.load();
+      return nativeAd;
+    } catch (e) {
+      // print('❌ Error loading Native Ad: $e'); // Removed print
+      return null;
+    }
+  }
+
+  /// Dispose a native ad
+  void disposeNativeAd(NativeAd ad) {
+    ad.dispose();
+  }
+
   /// ========== AD PRELOADING ==========
   /// Preload next ads for faster display
   Future<void> preloadNextAds() async {

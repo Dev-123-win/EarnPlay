@@ -143,134 +143,48 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ],
                     ),
                   ),
-                  title: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: colorScheme.onPrimary.withAlpha(30),
-                                border: Border.all(
-                                  color: colorScheme.onPrimary.withAlpha(50),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Text(
-                                '💰',
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    'EarnPlay',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .headlineSmall
-                                        ?.copyWith(
-                                          color: colorScheme.onPrimary,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.8,
-                                          fontSize: 24,
-                                        ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    'Play & Earn Daily',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                          color: colorScheme.onPrimary
-                                              .withAlpha(180),
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 11,
-                                          letterSpacing: 0.3,
-                                        ),
-                                    maxLines: 1,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  title: Text(
+                    'EarnPlay',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: colorScheme.onPrimary,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                      fontSize: 24,
+                    ),
                   ),
-                  centerTitle: false,
+                  centerTitle: true,
                   collapseMode: CollapseMode.parallax,
                 ),
-                actions: [
-                  // Coin display in AppBar
-                  Consumer<UserProvider>(
-                    builder: (context, userProvider, _) {
-                      return Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 10,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.onPrimary.withAlpha(28),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: colorScheme.onPrimary.withAlpha(60),
-                            width: 1.2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(30),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFFFFD700),
-                              ),
-                              child: Icon(
-                                Iconsax.coin_1,
-                                size: 16,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${userProvider.userData?.coins ?? 0}',
-                              style: Theme.of(context).textTheme.labelLarge
-                                  ?.copyWith(
-                                    color: colorScheme.onPrimary,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                leading: Container(
+                  margin: const EdgeInsets.only(left: 12, top: 10, bottom: 10),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: colorScheme.onPrimary.withAlpha(20),
+                    border: Border.all(
+                      color: colorScheme.onPrimary.withAlpha(50),
+                      width: 1.2,
+                    ),
                   ),
+                  child: IconButton(
+                    icon: Icon(
+                      Iconsax.user,
+                      color: colorScheme.onPrimary,
+                      size: 22,
+                    ),
+                    onPressed: () =>
+                        Navigator.of(context).pushNamed('/profile'),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
+                  ),
+                ),
+                actions: [
                   // Notification button
                   Container(
                     margin: const EdgeInsets.only(
-                      right: 8,
+                      right: 12,
                       top: 10,
                       bottom: 10,
                     ),
@@ -314,36 +228,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ],
                     ),
                   ),
-                  // Profile button
-                  Container(
-                    margin: const EdgeInsets.only(
-                      right: 12,
-                      top: 10,
-                      bottom: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: colorScheme.onPrimary.withAlpha(20),
-                      border: Border.all(
-                        color: colorScheme.onPrimary.withAlpha(50),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        Iconsax.user,
-                        color: colorScheme.onPrimary,
-                        size: 22,
-                      ),
-                      onPressed: () =>
-                          Navigator.of(context).pushNamed('/profile'),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 40,
-                      ),
-                    ),
-                  ),
                 ],
               ),
 
@@ -378,275 +262,121 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ],
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
+                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ===== HEADER SECTION WITH ENHANCED VISUAL HIERARCHY =====
+                          // ===== HEADER WITH BALANCE TITLE =====
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: colorScheme.onPrimary.withAlpha(
-                                        32,
-                                      ),
-                                      border: Border.all(
-                                        color: colorScheme.onPrimary.withAlpha(
-                                          80,
-                                        ),
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      Iconsax.coin_1,
-                                      size: 26,
+                              Text('💰', style: const TextStyle(fontSize: 20)),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Your Balance',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
                                       color: colorScheme.onPrimary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 16,
+                                      letterSpacing: 0.3,
                                     ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Your Balance',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .labelMedium
-                                            ?.copyWith(
-                                              color: colorScheme.onPrimary
-                                                  .withAlpha(220),
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 12,
-                                              letterSpacing: 0.5,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Total Earnings',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .labelSmall
-                                            ?.copyWith(
-                                              color: colorScheme.onPrimary
-                                                  .withAlpha(140),
-                                              fontWeight: FontWeight.w400,
-                                              fontSize: 10,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.onPrimary.withAlpha(32),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: colorScheme.onPrimary.withAlpha(80),
-                                    width: 1.2,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '⭐',
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Premium',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .labelSmall
-                                          ?.copyWith(
-                                            color: colorScheme.onPrimary,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 11,
-                                          ),
-                                    ),
-                                  ],
-                                ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 28),
-                          // ===== MAIN BALANCE DISPLAY - PRIMARY HIERARCHY ELEMENT =====
+                          const SizedBox(height: 20),
+                          // ===== BALANCE AMOUNT DISPLAY WITH ANIMATION =====
                           Container(
-                            padding: const EdgeInsets.all(20),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 24,
+                            ),
                             decoration: BoxDecoration(
-                              color: colorScheme.onPrimary.withAlpha(20),
-                              borderRadius: BorderRadius.circular(20),
+                              color: colorScheme.onPrimary.withAlpha(18),
+                              borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: colorScheme.onPrimary.withAlpha(40),
+                                color: colorScheme.onPrimary.withAlpha(30),
                                 width: 1,
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withAlpha(15),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
+                                Flexible(
+                                  child: CurrencyDisplay(
+                                    amount: '${userProvider.userData!.coins}',
+                                    coinSize: 40,
+                                    spacing: 12,
+                                    textStyle: Theme.of(context)
+                                        .textTheme
+                                        .displaySmall
+                                        ?.copyWith(
+                                          color: colorScheme.onPrimary,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 36,
+                                        ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
                                 Text(
-                                  'Available Balance',
+                                  '(animated updates)',
                                   style: Theme.of(context).textTheme.labelSmall
                                       ?.copyWith(
                                         color: colorScheme.onPrimary.withAlpha(
-                                          180,
+                                          120,
                                         ),
                                         fontWeight: FontWeight.w500,
-                                        letterSpacing: 0.3,
+                                        fontSize: 10,
                                       ),
-                                ),
-                                const SizedBox(height: 12),
-                                Flexible(
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
-                                    child: CurrencyDisplay(
-                                      amount: '${userProvider.userData!.coins}',
-                                      coinSize: 48,
-                                      spacing: 14,
-                                      textStyle: Theme.of(context)
-                                          .textTheme
-                                          .displayMedium
-                                          ?.copyWith(
-                                            color: colorScheme.onPrimary,
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 42,
-                                          ),
-                                    ),
-                                  ),
                                 ),
                               ],
                             ),
                           ),
                           const SizedBox(height: 24),
-                          // ===== ACTION BUTTONS WITH ENHANCED STYLING =====
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  height: 52,
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.onPrimary.withAlpha(24),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: colorScheme.onPrimary.withAlpha(
-                                        60,
-                                      ),
-                                      width: 1.2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withAlpha(12),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      onTap: () => Navigator.of(
-                                        context,
-                                      ).pushNamed('/withdrawal'),
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Iconsax.arrow_up_1,
-                                            size: 20,
-                                            color: colorScheme.onPrimary,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Withdraw',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .labelLarge
-                                                ?.copyWith(
-                                                  color: colorScheme.onPrimary,
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 14,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+                          // ===== WITHDRAW BUTTON =====
+                          Container(
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: colorScheme.onPrimary,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: colorScheme.onPrimary.withAlpha(120),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
+                                  spreadRadius: 1,
                                 ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Container(
-                                  height: 52,
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.onPrimary,
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: colorScheme.onPrimary.withAlpha(
-                                          120,
-                                        ),
-                                        blurRadius: 16,
-                                        offset: const Offset(0, 6),
-                                        spreadRadius: 1,
-                                      ),
-                                    ],
-                                  ),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      onTap: () => Navigator.of(
-                                        context,
-                                      ).pushNamed('/withdrawal'),
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Iconsax.add_circle,
-                                            size: 20,
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () => Navigator.of(
+                                  context,
+                                ).pushNamed('/withdrawal'),
+                                borderRadius: BorderRadius.circular(16),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      '💼',
+                                      style: const TextStyle(fontSize: 20),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'Withdraw',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelLarge
+                                          ?.copyWith(
                                             color: colorScheme.primary,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14,
                                           ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Add Fund',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .labelLarge
-                                                ?.copyWith(
-                                                  color: colorScheme.primary,
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 14,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ],
                       ),

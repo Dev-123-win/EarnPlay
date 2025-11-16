@@ -64,13 +64,27 @@ class FirebaseService {
 
       final userCredential = await _auth.signInWithCredential(credential);
 
-      // Create user document if new user
+      // Create user document if new user (using SetOptions merge to avoid overwriting)
       await _firestore.collection('users').doc(userCredential.user!.uid).set({
+        'uid': userCredential.user!.uid,
         'email': userCredential.user!.email,
-        'displayName': userCredential.user!.displayName,
+        'displayName': userCredential.user!.displayName ?? '',
         'coins': 0,
         'createdAt': FieldValue.serverTimestamp(),
         'referralCode': _generateReferralCode(),
+        'referredBy': null,
+        'dailyStreak': {
+          'currentStreak': 0,
+          'lastCheckIn': null,
+          'checkInDates': [],
+        },
+        'totalSpins': 3,
+        'lastSpinResetDate': FieldValue.serverTimestamp(),
+        'watchedAdsToday': 0,
+        'lastAdResetDate': FieldValue.serverTimestamp(),
+        'totalReferrals': 0,
+        'totalGamesWon': 0,
+        'totalAdsWatched': 0,
       }, SetOptions(merge: true));
 
       return userCredential.user;
@@ -89,6 +103,8 @@ class FirebaseService {
   }
 
   // User Document Methods
+  /// Create user document on signup
+  /// Initializes all required fields for security rules validation
   Future<void> _createUserDocument({
     required String uid,
     required String email,
@@ -98,21 +114,22 @@ class FirebaseService {
       'uid': uid,
       'email': email,
       'displayName': '',
-      'coins': 0,
+      'coins': 0, // Must start at 0 per security rules
       'referralCode': _generateReferralCode(),
-      'referredBy': referralCode,
+      'referredBy': referralCode, // Can be null initially
       'createdAt': FieldValue.serverTimestamp(),
       'dailyStreak': {
         'currentStreak': 0,
         'lastCheckIn': null,
         'checkInDates': [],
       },
-      'spinsRemaining': 3,
-      'lastSpinReset': FieldValue.serverTimestamp(),
-      'watchedAdsToday': 0,
-      'lastAdReset': FieldValue.serverTimestamp(),
+      'totalSpins': 3, // Start with 3 spins per day
+      'lastSpinResetDate': FieldValue.serverTimestamp(),
+      'watchedAdsToday': 0, // Track daily ads watched
+      'lastAdResetDate': FieldValue.serverTimestamp(),
       'totalReferrals': 0,
-      'withdrawalHistory': [],
+      'totalGamesWon': 0,
+      'totalAdsWatched': 0,
     });
   }
 

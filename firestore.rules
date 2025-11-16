@@ -3,154 +3,208 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ============================================
+    // ADMIN UID - SET THIS TO YOUR ACTUAL ADMIN UID
+    // ============================================
+    function isAdminUser() {
+      return request.auth.uid == 'ADMIN_UID_HERE';
+    }
+
+    // ============================================
     // USERS COLLECTION
     // ============================================
     match /users/{userId} {
-      // Users can only read/write their own document
+      // Users can only read their own document
       allow read: if request.auth.uid == userId;
-      allow write: if request.auth.uid == userId && 
-                      validateUserDocument(resource.data);
+      
+      // Users can write to their own document with strict validation
+      allow create: if request.auth.uid == userId && 
+                       validateNewUserDocument(request.resource.data);
+      
+      allow update: if request.auth.uid == userId && 
+                       validateUserUpdate(resource.data, request.resource.data);
 
-      // Helper function to validate user document structure
-      function validateUserDocument(data) {
-        return data.size() > 0 &&
+      // Helper function to validate new user document (on creation)
+      function validateNewUserDocument(data) {
+        return data.size() >= 7 &&
                data.keys().hasAll(['uid', 'email', 'displayName', 'coins', 
-                                   'dailyStreak', 'referralCode', 'createdAt']);
+                                   'dailyStreak', 'referralCode', 'createdAt', 'referredBy']) &&
+               data.uid is string &&
+               data.email is string &&
+               data.displayName is string &&
+               data.coins is number &&
+               data.coins == 0 && // New users start with 0 coins
+               data.dailyStreak is map &&
+               data.referralCode is string &&
+               data.referralCode.size() >= 8 &&
+               data.createdAt is timestamp &&
+               (data.referredBy == null || data.referredBy is string) &&
+               data.watchedAdsToday is number &&
+               data.watchedAdsToday == 0 &&
+               data.lastAdResetDate is timestamp &&
+               data.totalSpins is number &&
+               data.totalSpins == 3 &&
+               data.lastSpinResetDate is timestamp &&
+               data.totalReferrals is number &&
+               data.totalReferrals == 0;
       }
 
-      // Coin Transactions Subcollection
-      match /coin_transactions/{transaction} {
-        allow read: if request.auth.uid == userId;
-        allow write: if request.auth.uid == userId &&
-                        request.resource.data.size() <= 5 &&
-                        request.resource.data.keys().hasAll(['amount', 'reason', 'timestamp']);
+      // Validate user document updates - STRICT field-level validation
+      function validateUserUpdate(oldData, newData) {
+        // FIELD 1: Coins - only allow specific increments (5, 10, 15, 20, 25, 30, 50)
+        let coinDifference = newData.coins - oldData.coins;
+        let isValidCoinIncrement = coinDifference == 0 || 
+                                    coinDifference in [5, 10, 15, 20, 25, 30, 50, -100, -500, -1000];
+        
+        // FIELD 2: watchedAdsToday - can only increment by 1 or reset to 0/1 on new day
+        let isNewDay = (request.time.toMillis() / 86400000) > (oldData.lastAdResetDate.toMillis() / 86400000);
+        let isValidAdWatch = (newData.watchedAdsToday == oldData.watchedAdsToday) || 
+                             (newData.watchedAdsToday == oldData.watchedAdsToday + 1 && newData.watchedAdsToday <= 10) ||
+                             (isNewDay && newData.watchedAdsToday == 1);
+        
+        // FIELD 3: totalSpins - can decrement by 1 or reset to 3 on new day
+        let isValidSpinUpdate = (newData.totalSpins == oldData.totalSpins) ||
+                                (newData.totalSpins == oldData.totalSpins - 1 && newData.totalSpins >= 0) ||
+                                (isNewDay && newData.totalSpins == 3);
+        
+        // FIELD 4: referredBy - can ONLY be set ONCE (from null to non-null), NEVER changed after
+        let isValidReferralUpdate = (newData.referredBy == oldData.referredBy) ||
+                                     (oldData.referredBy == null && newData.referredBy != null);
+        
+        // FIELD 5: totalReferrals - can only increment
+        let isValidReferralCount = newData.totalReferrals >= oldData.totalReferrals;
+        
+        // FIELD 6: Other fields cannot change (immutable after creation)
+        let immutableFieldsUnchanged = newData.uid == oldData.uid &&
+                                       newData.email == oldData.email &&
+                                       newData.referralCode == oldData.referralCode &&
+                                       newData.createdAt == oldData.createdAt;
+        
+        return isValidCoinIncrement && 
+               isValidAdWatch && 
+               isValidSpinUpdate &&
+               isValidReferralUpdate &&
+               isValidReferralCount &&
+               immutableFieldsUnchanged;
       }
 
-      // Game History Subcollection
-      match /game_history/{gameId} {
+      // Action Log Subcollection - immutable audit trail for fraud detection
+      // Only the client can write (with server-side timestamp validation)
+      // Stores ALL coin-earning actions with server timestamps
+      match /actions/{actionId} {
         allow read: if request.auth.uid == userId;
-        allow write: if request.auth.uid == userId &&
-                        validateGameHistory(request.resource.data);
+        allow create: if request.auth.uid == userId &&
+                         validateAction(request.resource.data);
+        allow update, delete: if false; // Immutable once created
       }
 
-      // Withdrawal Requests Subcollection
-      match /withdrawal_requests/{withdrawalId} {
+      // Game Stats Subcollection - monthly aggregates (replaces per-game records)
+      match /monthly_stats/{yearMonth} {
         allow read: if request.auth.uid == userId;
-        allow write: if request.auth.uid == userId &&
-                        validateWithdrawalRequest(request.resource.data);
+        allow create, update: if request.auth.uid == userId &&
+                               validateMonthlyStats(request.resource.data);
+        allow delete: if false;
       }
 
-      // Action Queue Subcollection (offline actions)
-      match /action_queue/{actionId} {
+      // Daily Spin/Ad Stats (for tracking resets)
+      match /daily_limits/{dayKey} {
         allow read: if request.auth.uid == userId;
-        allow write: if request.auth.uid == userId &&
-                        validateActionQueue(request.resource.data);
+        allow create, update: if request.auth.uid == userId &&
+                               validateDailyLimits(request.resource.data);
+      }
+
+      // Helper function to validate action (audit trail)
+      function validateAction(data) {
+        return data.size() >= 4 &&
+               data.keys().hasAll(['type', 'amount', 'timestamp', 'userId']) &&
+               (data.type == 'GAME_WON' || 
+                data.type == 'AD_WATCHED' || 
+                data.type == 'SPIN_REWARD' ||
+                data.type == 'REFERRAL_BONUS') &&
+               data.amount is number &&
+               data.amount > 0 &&
+               data.timestamp is timestamp &&
+               data.userId is string &&
+               data.userId == userId;
+      }
+
+      // Helper function to validate monthly stats
+      function validateMonthlyStats(data) {
+        return data.size() >= 6 &&
+               data.keys().hasAll(['month', 'coinsEarned', 'adsWatched', 'gamesPlayed', 'gameWins', 'lastUpdated']) &&
+               data.month is string &&
+               data.coinsEarned is number &&
+               data.adsWatched is number &&
+               data.gamesPlayed is number &&
+               data.gameWins is number &&
+               data.lastUpdated is timestamp;
+      }
+
+      // Helper function to validate daily limits
+      function validateDailyLimits(data) {
+        return data.size() >= 3 &&
+               data.keys().hasAll(['date', 'adsWatched', 'lastUpdated']) &&
+               data.date is string &&
+               data.adsWatched is number &&
+               data.adsWatched <= 10 &&
+               data.lastUpdated is timestamp;
       }
     }
 
+    // NOTE: referral_codes collection removed - referral codes are stored in user documents
+    // This prevents duplicate/inconsistent data and reduces writes
+
     // ============================================
-    // REFERRAL CODES COLLECTION
+    // ADMIN COLLECTION
     // ============================================
-    match /referral_codes/{codeId} {
-      // Anyone can read referral code info
-      allow read: if request.auth != null;
-      // Only system (via transaction) can write
-      allow write: if false; // No direct writes, only via transactions
+    match /admins/{uid} {
+      allow read: if request.auth != null && isAdminUser();
+      allow write: if isAdminUser();
     }
 
     // ============================================
-    // WITHDRAWALS COLLECTION (Admin Only for writes)
+    // WITHDRAWALS COLLECTION (Main collection)
     // ============================================
     match /withdrawals/{withdrawalId} {
       // Users can read their own withdrawals
       allow read: if request.auth != null && 
                      (request.auth.uid == resource.data.userId || 
-                      isAdmin(request.auth.uid));
-      // Users can create (their own), admins can update status
+                      isAdminUser());
+      
+      // Users can create withdrawal requests (with strict validation)
       allow create: if request.auth != null && 
                        request.auth.uid == request.resource.data.userId &&
-                       validateWithdrawalRequest(request.resource.data);
-      allow update: if isAdmin(request.auth.uid) &&
+                       validateWithdrawalCreation(request.resource.data);
+      
+      // Only admins can update withdrawal status
+      allow update: if isAdminUser() &&
                        validateWithdrawalUpdate(resource.data, request.resource.data);
+      
+      allow delete: if false; // Cannot delete withdrawals
     }
 
-    // ============================================
-    // GAME HISTORY COLLECTION (For analytics/stats)
-    // ============================================
-    match /game_history/{gameId} {
-      // Users can read all games
-      allow read: if request.auth != null;
-      // Only users can create their own game history
-      allow create: if request.auth != null && 
-                       request.auth.uid == request.resource.data.userId &&
-                       validateGameHistory(request.resource.data);
-    }
-
-    // ============================================
-    // REFERRAL RECORDS COLLECTION
-    // ============================================
-    match /referral_records/{recordId} {
-      // Users can read their referral records
-      allow read: if request.auth != null &&
-                     (request.auth.uid == resource.data.referrerUserId ||
-                      request.auth.uid == resource.data.referredUserId);
-      // Only system can write
-      allow write: if false;
-    }
-
-    // ============================================
-    // HELPER FUNCTIONS
-    // ============================================
-
-    // Validate Game History Document
-    function validateGameHistory(data) {
-      return data.size() >= 5 &&
-             data.keys().hasAll(['userId', 'gameName', 'isWon', 'coinsEarned', 'playedAt']) &&
-             data.gameName is string &&
-             data.isWon is bool &&
-             data.coinsEarned is number &&
-             data.coinsEarned >= 0 &&
-             data.playedAt is timestamp;
-    }
-
-    // Validate Withdrawal Request
-    function validateWithdrawalRequest(data) {
+    // Helper function to validate withdrawal creation
+    function validateWithdrawalCreation(data) {
       return data.size() >= 7 &&
-             data.keys().hasAll(['userId', 'amount', 'paymentMethod', 
-                                'paymentDetails', 'status', 'requestedAt']) &&
+             data.keys().hasAll(['userId', 'amount', 'paymentMethod', 'paymentDetails', 'status', 'requestedAt', 'lastActionTimestamp']) &&
              data.amount is number &&
-             data.amount >= 100 &&
+             data.amount >= 500 && // Minimum withdrawal
              data.amount <= 100000 &&
              (data.paymentMethod == 'UPI' || data.paymentMethod == 'BANK_TRANSFER') &&
              data.paymentDetails is string &&
              data.paymentDetails.size() > 0 &&
-             (data.status == 'PENDING' || data.status == 'APPROVED' || data.status == 'REJECTED') &&
-             data.requestedAt is timestamp;
+             data.status == 'PENDING' &&
+             data.requestedAt is timestamp &&
+             data.lastActionTimestamp is timestamp;
     }
 
-    // Validate Withdrawal Update (for admin approval)
+    // Helper function to validate withdrawal update (admin approval)
     function validateWithdrawalUpdate(oldData, newData) {
       return oldData.status == 'PENDING' &&
              (newData.status == 'APPROVED' || newData.status == 'REJECTED') &&
              newData.processedAt is timestamp &&
-             (newData.status == 'REJECTED' ? (newData.rejectionReason is string) : true);
-    }
-
-    // Validate Action Queue Item
-    function validateActionQueue(data) {
-      return data.size() >= 5 &&
-             data.keys().hasAll(['userId', 'actionType', 'coinsChange', 'createdAt']) &&
-             (data.actionType == 'GAME_WON' || 
-              data.actionType == 'AD_WATCHED' || 
-              data.actionType == 'SPIN' || 
-              data.actionType == 'REFERRAL_BONUS') &&
-             data.coinsChange is number &&
-             data.createdAt is timestamp;
-    }
-
-    // Check if user is admin
-    function isAdmin(uid) {
-      return get(/databases/$(database)/documents/admins/$(uid)).data.isAdmin == true;
+             (newData.status == 'REJECTED' ? (newData.rejectionReason is string) : true) &&
+             newData.userId == oldData.userId &&
+             newData.amount == oldData.amount;
     }
 
     // Default deny
