@@ -3,7 +3,7 @@ import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/app_shell.dart';
 import 'screens/daily_streak_screen.dart';
 import 'screens/watch_earn_screen.dart';
 import 'screens/spin_win_screen.dart';
@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
-        '/home': (context) => const HomeScreen(),
+        '/home': (context) => const AppShell(),
         '/daily_streak': (context) => const DailyStreakScreen(),
         '/watch_earn': (context) => const WatchEarnScreen(),
         '/spin_win': (context) => const SpinWinScreen(),

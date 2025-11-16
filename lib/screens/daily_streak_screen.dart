@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:step_progress_indicator/step_progress_indicator.dart';
 import '../providers/user_provider.dart';
 import '../utils/dialog_helper.dart';
+import '../services/ad_service.dart';
 
 class DailyStreakScreen extends StatefulWidget {
   const DailyStreakScreen({super.key});
@@ -12,16 +14,32 @@ class DailyStreakScreen extends StatefulWidget {
 }
 
 class _DailyStreakScreenState extends State<DailyStreakScreen> {
+  late AdService _adService;
+
+  @override
+  void initState() {
+    super.initState();
+    _adService = AdService();
+  }
+
   Future<void> _claimStreak() async {
     try {
-      // Simulate claiming streak
-      await Future.delayed(const Duration(milliseconds: 500));
+      final userProvider = context.read<UserProvider>();
+
+      // Call the actual claim streak method from provider
+      await userProvider.claimDailyStreak();
+
       if (mounted) {
-        SnackbarHelper.showSuccess(context, '✅ Streak claimed! ₹50 earned');
+        final coinsEarned =
+            (userProvider.userData?.dailyStreak.currentStreak ?? 0) * 10;
+        SnackbarHelper.showSuccess(
+          context,
+          '✅ Streak claimed! $coinsEarned coins earned',
+        );
       }
     } catch (e) {
       if (mounted) {
-        SnackbarHelper.showError(context, 'Error: $e');
+        SnackbarHelper.showError(context, 'Error claiming streak: $e');
       }
     }
   }
@@ -96,111 +114,86 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        // Progress bar with segment markers and glow effect
-                        Column(
-                          children: [
-                            Stack(
-                              children: [
-                                // Glow effect background
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    height: 16,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(8),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: colorScheme.primary.withValues(
-                                            alpha: 102,
-                                          ),
-                                          blurRadius: 8,
-                                          spreadRadius: 2,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                // Progress bar
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: LinearProgressIndicator(
-                                    value: (streak.currentStreak / 7).clamp(
-                                      0,
-                                      1,
-                                    ),
-                                    minHeight: 8,
-                                    backgroundColor: colorScheme.primary
-                                        .withValues(alpha: 51),
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      colorScheme.primary,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                        // ========== STEP PROGRESS INDICATOR (Example 8 Style) ==========
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 20,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            color: colorScheme.primary.withAlpha(13),
+                            border: Border.all(
+                              color: colorScheme.primary.withAlpha(51),
+                              width: 1,
                             ),
-                            const SizedBox(height: 12),
-                            // Segment markers
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: List.generate(7, (index) {
-                                final day = index + 1;
-                                final isCompleted =
-                                    index < streak.currentStreak;
-                                final isToday = index == streak.currentStreak;
+                          ),
+                          child: StepProgressIndicator(
+                            totalSteps: 7,
+                            currentStep: streak.currentStreak.clamp(0, 7),
+                            size: 50,
+                            padding: 8,
+                            selectedColor: const Color(
+                              0xFF1DD1A1,
+                            ), // Green for completed
+                            unselectedColor: colorScheme.primary.withAlpha(
+                              51,
+                            ), // Light purple for pending
+                            roundedEdges: const Radius.circular(12),
+                            customStep: (index, color, _) {
+                              final step = index + 1;
+                              final isCompleted = index < streak.currentStreak;
+                              final isToday = index == streak.currentStreak;
 
-                                return Column(
-                                  children: [
-                                    Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: isCompleted
-                                            ? const Color(0xFF1DD1A1)
-                                            : (isToday
-                                                  ? colorScheme.primary
-                                                  : colorScheme.surfaceDim),
-                                        border: isToday
-                                            ? Border.all(
-                                                color: colorScheme.primary,
-                                                width: 2,
-                                              )
-                                            : null,
-                                      ),
-                                      child: Center(
-                                        child: isCompleted
-                                            ? Icon(
-                                                Iconsax.tick_circle,
-                                                size: 18,
-                                                color: Colors.white,
-                                              )
-                                            : Text(
-                                                '$day',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: isToday
-                                                      ? colorScheme.onPrimary
-                                                      : colorScheme.onSurface,
-                                                ),
-                                              ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'D$day',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: colorScheme.onSurface.withValues(
-                                          alpha: 128,
+                              return Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: isCompleted
+                                      ? const Color(0xFF1DD1A1)
+                                      : (isToday
+                                            ? colorScheme.primary
+                                            : colorScheme.primary.withAlpha(
+                                                51,
+                                              )),
+                                  border: isToday
+                                      ? Border.all(
+                                          color: colorScheme.primary,
+                                          width: 2,
+                                        )
+                                      : null,
+                                  boxShadow: isToday
+                                      ? [
+                                          BoxShadow(
+                                            color: colorScheme.primary
+                                                .withAlpha(76),
+                                            blurRadius: 12,
+                                            spreadRadius: 2,
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: Center(
+                                  child: isCompleted
+                                      ? Icon(
+                                          Iconsax.tick_circle,
+                                          size: 24,
+                                          color: Colors.white,
+                                        )
+                                      : Text(
+                                          '$step',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w900,
+                                            color: isToday
+                                                ? colorScheme.onPrimary
+                                                : colorScheme.onSurface
+                                                      .withAlpha(128),
+                                          ),
                                         ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }),
-                            ),
-                          ],
+                                ),
+                              );
+                            },
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -229,15 +222,25 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
                   final isLocked = index > streak.currentStreak;
                   final reward = day == 7 ? 500 : 50 + (day * 10);
 
-                  return _buildDayCard(
-                    context,
-                    colorScheme,
-                    day: day,
-                    reward: reward,
-                    isClaimed: isClaimed,
-                    isToday: isToday,
-                    isLocked: isLocked,
-                    onClaim: isToday ? _claimStreak : null,
+                  return Column(
+                    children: [
+                      _buildDayCard(
+                        context,
+                        colorScheme,
+                        day: day,
+                        reward: reward,
+                        isClaimed: isClaimed,
+                        isToday: isToday,
+                        isLocked: isLocked,
+                        onClaim: isToday ? _claimStreak : null,
+                      ),
+                      // Show native ad between every 2 cards
+                      if ((index + 1) % 2 == 0 && index != 6) ...[
+                        const SizedBox(height: 8),
+                        _buildNativeAdPlaceholder(),
+                        const SizedBox(height: 8),
+                      ],
+                    ],
                   );
                 }),
                 const SizedBox(height: 24),
@@ -341,12 +344,26 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      '₹$reward',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: statusColor,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    // ===== COIN DISPLAY WITH IMAGE =====
+                    Row(
+                      children: [
+                        Image.asset(
+                          'coin.png',
+                          width: 16,
+                          height: 16,
+                          fit: BoxFit.contain,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$reward coins',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: statusColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -390,5 +407,75 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildNativeAdPlaceholder() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.green.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.local_offer,
+              color: Colors.green.shade700,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sponsored Offer',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                Text(
+                  'Check special deals for you',
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.green.shade600,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Text(
+              'View',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _adService.disposeBannerAd();
+    super.dispose();
   }
 }

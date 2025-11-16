@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../providers/user_provider.dart';
 import '../../utils/animation_helper.dart';
+import '../../services/ad_service.dart';
 
 class TicTacToeScreen extends StatefulWidget {
   const TicTacToeScreen({super.key});
@@ -15,6 +17,7 @@ enum GameResult { playerWon, aiWon, draw, playing }
 class _TicTacToeScreenState extends State<TicTacToeScreen> {
   static const int boardSize = 9;
   static const int coinsWon = 10;
+  static const int doubledCoinsWon = coinsWon * 2; // 20 coins for ad watch
 
   late List<String> board;
   late String playerSymbol;
@@ -24,10 +27,13 @@ class _TicTacToeScreenState extends State<TicTacToeScreen> {
   int playerScore = 0;
   int aiScore = 0;
   bool isThinking = false;
+  late AdService _adService;
 
   @override
   void initState() {
     super.initState();
+    _adService = AdService();
+    _adService.loadRewardedAd();
     _initializeGame();
   }
 
@@ -190,11 +196,13 @@ class _TicTacToeScreenState extends State<TicTacToeScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     String title, message;
     Color accentColor;
+    bool showAdOption = false;
 
     if (result == GameResult.playerWon) {
       title = '🎉 You Won!';
       message = 'Congratulations! You earned $coinsWon coins.';
       accentColor = colorScheme.tertiary;
+      showAdOption = true; // Show ad option only on win
       _updateScore(playerWon: true);
     } else if (result == GameResult.draw) {
       title = '🤝 Draw!';
@@ -216,15 +224,134 @@ class _TicTacToeScreenState extends State<TicTacToeScreen> {
           title,
           style: TextStyle(color: accentColor, fontWeight: FontWeight.bold),
         ),
-        content: Text(message),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message),
+            if (showAdOption) ...[
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.play_circle,
+                      color: Colors.amber.shade600,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Watch an ad to double your reward!',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w500,
+                          color: Colors.amber.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() => _initializeGame());
-            },
-            child: const Text('Play Again'),
-          ),
+          if (showAdOption) ...[
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() => _initializeGame());
+              },
+              child: Text('Claim $coinsWon'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                try {
+                  bool rewardGiven = await _adService.showRewardedAd(
+                    onUserEarnedReward: (RewardItem reward) async {
+                      try {
+                        final userProvider = context.read<UserProvider>();
+                        await userProvider.updateCoins(doubledCoinsWon);
+                        if (mounted && userProvider.userData?.uid != null) {
+                          await userProvider.loadUserData(
+                            userProvider.userData!.uid,
+                          );
+                        }
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    '🎁 Earned $doubledCoinsWon coins (doubled)!',
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: Colors.green,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                          setState(() => _initializeGame());
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error updating coins: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  );
+                  if (!rewardGiven && mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Ad not ready. Try again later.'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                    setState(() => _initializeGame());
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error showing ad: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              icon: const Icon(Icons.play_circle),
+              label: Text('Watch Ad (2x = $doubledCoinsWon)'),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.amber.shade600,
+              ),
+            ),
+          ] else ...[
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() => _initializeGame());
+              },
+              child: const Text('Play Again'),
+            ),
+          ],
           FilledButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Exit'),
@@ -237,32 +364,16 @@ class _TicTacToeScreenState extends State<TicTacToeScreen> {
   void _updateScore({required bool playerWon}) async {
     if (playerWon) {
       setState(() => playerScore++);
-      final userProvider = context.read<UserProvider>();
-      try {
-        await userProvider.updateCoins(coinsWon);
-        if (mounted && userProvider.userData?.uid != null) {
-          await userProvider.loadUserData(userProvider.userData!.uid);
-        }
-      } catch (e) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Error'),
-              content: const Text('Failed to update coins'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
-        }
-      }
+      // Don't update coins here - will be updated in dialog with optional ad reward
     } else {
       setState(() => aiScore++);
     }
+  }
+
+  @override
+  void dispose() {
+    _adService.disposeBannerAd();
+    super.dispose();
   }
 
   @override

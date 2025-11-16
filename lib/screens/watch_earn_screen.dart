@@ -25,6 +25,12 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
     _adService.loadRewardedAd();
   }
 
+  @override
+  void dispose() {
+    _adService.disposeBannerAd();
+    super.dispose();
+  }
+
   Future<void> _watchAd(int adIndex) async {
     final userProvider = context.read<UserProvider>();
     final watched = userProvider.userData?.watchedAdsToday ?? 0;
@@ -194,10 +200,20 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                   const SizedBox(height: 16),
                   ...List.generate(remaining, (index) {
                     final adNumber = watched + index + 1;
-                    return _buildAdCard(
-                      adNumber: adNumber,
-                      onWatch: () => _watchAd(adNumber - 1),
-                      isDisabled: false,
+                    return Column(
+                      children: [
+                        _buildAdCard(
+                          adNumber: adNumber,
+                          onWatch: () => _watchAd(adNumber - 1),
+                          isDisabled: false,
+                        ),
+                        // Show native ad between every 3 cards
+                        if ((index + 1) % 3 == 0 && index != remaining - 1) ...[
+                          const SizedBox(height: 8),
+                          _buildNativeAdPlaceholder(),
+                          const SizedBox(height: 8),
+                        ],
+                      ],
                     );
                   }),
                 ] else ...[
@@ -303,6 +319,74 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildNativeAdPlaceholder() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.shopping_bag,
+                  color: Colors.blue.shade700,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sponsored Ad',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    Text(
+                      'Discover amazing offers',
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade600,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Visit',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

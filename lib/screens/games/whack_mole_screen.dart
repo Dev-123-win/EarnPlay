@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../providers/user_provider.dart';
+import '../../services/ad_service.dart';
 
 class WhackMoleScreen extends StatefulWidget {
   const WhackMoleScreen({super.key});
@@ -21,10 +23,13 @@ class _WhackMoleScreenState extends State<WhackMoleScreen> {
   late int activeMoleIndex;
   late Timer gameTimer;
   late Timer moleTimer;
+  late AdService _adService;
 
   @override
   void initState() {
     super.initState();
+    _adService = AdService();
+    _adService.loadRewardedAd();
     _initializeGame();
   }
 
@@ -99,7 +104,8 @@ class _WhackMoleScreenState extends State<WhackMoleScreen> {
   }
 
   void _showGameResult() {
-    final coins = (score / 2).toInt().clamp(5, 100);
+    final baseCoins = (score / 2).toInt().clamp(5, 100);
+    final doubledCoins = baseCoins * 2;
 
     showDialog(
       context: context,
@@ -119,10 +125,38 @@ class _WhackMoleScreenState extends State<WhackMoleScreen> {
             const Text('Moles Whacked'),
             const SizedBox(height: 16),
             Text(
-              'You earned $coins coins!',
+              'Base Coins: $baseCoins 🎁',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: Colors.orange,
                 fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.play_circle,
+                    color: Colors.amber.shade600,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Watch an ad to double your reward!',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -131,9 +165,75 @@ class _WhackMoleScreenState extends State<WhackMoleScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              _handleGameEnd(coins);
+              _handleGameEnd(baseCoins);
             },
-            child: const Text('OK'),
+            child: Text('Claim $baseCoins'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              try {
+                bool rewardGiven = await _adService.showRewardedAd(
+                  onUserEarnedReward: (RewardItem reward) async {
+                    try {
+                      Navigator.pop(context);
+                      await _handleGameEnd(doubledCoins);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  '🎉 Earned $doubledCoins coins (doubled)!',
+                                ),
+                              ],
+                            ),
+                            backgroundColor: Colors.green,
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error updating coins: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                );
+                if (!rewardGiven && mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Ad not ready. Try again later.'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error showing ad: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.play_circle),
+            label: Text('Watch Ad (2x = $doubledCoins)'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.amber.shade600,
+            ),
           ),
         ],
       ),
@@ -162,6 +262,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen> {
       gameTimer.cancel();
       moleTimer.cancel();
     }
+    _adService.disposeBannerAd();
     super.dispose();
   }
 
