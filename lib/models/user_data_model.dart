@@ -4,6 +4,10 @@ class UserData {
   DailyStreak dailyStreak;
   int spinsRemaining;
   int watchedAdsToday;
+  DateTime?
+  lastAdResetDate; // Track when ads were last reset (for lazy reset logic)
+  DateTime?
+  lastSpinResetDate; // Track when spins were last reset (for lazy reset logic)
   String referralCode;
   DateTime lastSync;
   String email;
@@ -21,6 +25,8 @@ class UserData {
     required this.dailyStreak,
     this.spinsRemaining = 3,
     this.watchedAdsToday = 0,
+    this.lastAdResetDate,
+    this.lastSpinResetDate,
     required this.referralCode,
     required this.lastSync,
     required this.email,
@@ -40,6 +46,8 @@ class UserData {
       dailyStreak: DailyStreak.fromMap(map['dailyStreak'] ?? {}),
       spinsRemaining: map['spinsRemaining'] ?? 3,
       watchedAdsToday: map['watchedAdsToday'] ?? 0,
+      lastAdResetDate: _parseTimestamp(map['lastAdResetDate']),
+      lastSpinResetDate: _parseTimestamp(map['lastSpinResetDate']),
       referralCode: map['referralCode'] ?? '',
       lastSync: _parseTimestamp(map['lastSync']) ?? DateTime.now(),
       email: map['email'] ?? '',
@@ -89,6 +97,8 @@ class UserData {
       'dailyStreak': dailyStreak.toMap(),
       'spinsRemaining': spinsRemaining,
       'watchedAdsToday': watchedAdsToday,
+      'lastAdResetDate': lastAdResetDate?.toIso8601String(),
+      'lastSpinResetDate': lastSpinResetDate?.toIso8601String(),
       'referralCode': referralCode,
       'lastSync': lastSync.toIso8601String(),
       'email': email,

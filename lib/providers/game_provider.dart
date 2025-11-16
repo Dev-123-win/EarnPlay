@@ -96,6 +96,7 @@ class GameProvider extends ChangeNotifier {
   /// Called every 10 games OR when user leaves the game screen
   /// OR every 5 minutes (auto-save)
   /// Reduces 20 writes to 2 writes for 10 games
+  /// CRITICAL: Initializes all monthly stats fields to prevent Firestore rule rejection
   Future<void> flushGameSession(String uid) async {
     if (_activeGameSession == null || _sessionGamesPlayed == 0) {
       return; // Nothing to flush
@@ -119,11 +120,17 @@ class GameProvider extends ChangeNotifier {
       });
 
       // Write 2: Update monthly stats
+      // CRITICAL: Initialize ALL fields (not just incremented ones) to avoid Firestore rule rejection
+      // This prevents "document missing required fields" errors on first write
       batch.set(monthlyStatsRef, {
         'month': currentMonth,
         'gamesPlayed': FieldValue.increment(_sessionGamesPlayed),
         'gameWins': FieldValue.increment(_sessionGamesWon),
         'coinsEarned': FieldValue.increment(_sessionCoinsEarned),
+        'adsWatched': 0, // ← Initialize missing fields
+        'spinsUsed': 0, // ← Initialize missing fields
+        'withdrawalRequests': 0, // ← Initialize missing fields
+        'whackMoleHighScore': 0, // ← Initialize missing fields
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/game_provider.dart';
 import '../../utils/animation_helper.dart';
 import '../../services/ad_service.dart';
 
@@ -14,7 +15,9 @@ class TicTacToeScreen extends StatefulWidget {
 
 enum GameResult { playerWon, aiWon, draw, playing }
 
-class _TicTacToeScreenState extends State<TicTacToeScreen> {
+/// CRITICAL: Add WidgetsBindingObserver to flush game session on app background
+class _TicTacToeScreenState extends State<TicTacToeScreen>
+    with WidgetsBindingObserver {
   static const int boardSize = 9;
   static const int coinsWon = 10;
   static const int doubledCoinsWon = coinsWon * 2; // 20 coins for ad watch
@@ -32,9 +35,25 @@ class _TicTacToeScreenState extends State<TicTacToeScreen> {
   @override
   void initState() {
     super.initState();
+    // CRITICAL: Register lifecycle observer to catch app background/close
+    WidgetsBinding.instance.addObserver(this);
     _adService = AdService();
     _adService.loadRewardedAd();
     _initializeGame();
+  }
+
+  /// CRITICAL: Handle app lifecycle changes
+  /// Flushes game session when app goes to background
+  /// Prevents data loss if user force-closes app
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      // App going to background - flush immediately
+      final uid = context.read<UserProvider>().userData?.uid;
+      if (uid != null) {
+        context.read<GameProvider>().flushGameSession(uid);
+      }
+    }
   }
 
   void _initializeGame() {
@@ -372,6 +391,13 @@ class _TicTacToeScreenState extends State<TicTacToeScreen> {
 
   @override
   void dispose() {
+    // CRITICAL: Flush game session before leaving screen to avoid data loss
+    final uid = context.read<UserProvider>().userData?.uid;
+    if (uid != null) {
+      context.read<GameProvider>().flushGameSession(uid);
+    }
+    // CRITICAL: Remove lifecycle observer to prevent memory leak
+    WidgetsBinding.instance.removeObserver(this);
     _adService.disposeBannerAd();
     super.dispose();
   }

@@ -389,37 +389,60 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Increment watched ads counter
+  /// Increment watched ads counter with lazy daily reset
   /// Called after a rewarded ad gives coins
-  /// Uses lazy reset: resets only on new day when first ad is watched
+  /// CRITICAL: Checks if day changed before incrementing
+  /// If new day, resets counter to 1 instead of incrementing from old value
+  /// Prevents "can't watch ads on new day" bug when watchedAdsToday was at limit
   Future<void> incrementWatchedAds(int coinsEarned) async {
     if (_userData == null) return;
 
     try {
-      _userData!.watchedAdsToday = _userData!.watchedAdsToday + 1;
-      _userData!.totalAdsWatched += 1;
-      await LocalStorageService.saveUserData(_userData!);
-
       final uid = _userData!.uid;
       final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+      final now = DateTime.now();
+      final lastReset = _userData!.lastAdResetDate ?? now;
 
-      // Persist to Firestore with coins increment
-      await userRef.update({
-        'watchedAdsToday': FieldValue.increment(1),
-        'lastAdResetDate': FieldValue.serverTimestamp(),
-        'coins': FieldValue.increment(coinsEarned),
-        'lastUpdated': FieldValue.serverTimestamp(),
-      });
+      // CRITICAL: Check if today's date differs from last reset date
+      final isNewDay =
+          now.day != lastReset.day ||
+          now.month != lastReset.month ||
+          now.year != lastReset.year;
+
+      if (isNewDay) {
+        // Reset counter for new day (don't increment old value)
+        await userRef.update({
+          'watchedAdsToday': 1, // ← Reset to 1, not increment
+          'lastAdResetDate': FieldValue.serverTimestamp(),
+          'coins': FieldValue.increment(coinsEarned),
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+
+        _userData!.watchedAdsToday = 1;
+        _userData!.lastAdResetDate = DateTime.now();
+      } else {
+        // Same day, increment normally
+        await userRef.update({
+          'watchedAdsToday': FieldValue.increment(1),
+          'coins': FieldValue.increment(coinsEarned),
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+
+        _userData!.watchedAdsToday++;
+      }
 
       // Create audit trail
       await userRef.collection('actions').add({
         'type': 'AD_WATCHED',
         'amount': coinsEarned,
+        'isNewDay': isNewDay,
         'timestamp': FieldValue.serverTimestamp(),
         'userId': uid,
       });
 
       _userData!.coins += coinsEarned;
+      _userData!.totalAdsWatched += 1;
+      await LocalStorageService.saveUserData(_userData!);
       notifyListeners();
     } catch (e) {
       _error = 'Failed to increment watched ads: $e';
@@ -433,8 +456,8 @@ class UserProvider extends ChangeNotifier {
     if (_userData == null) return;
 
     try {
-      _userData!.spinsRemaining = _userData!.spinsRemaining + 1;
       _userData!.totalSpins += 1;
+      _userData!.spinsRemaining += 1;
       await LocalStorageService.saveUserData(_userData!);
 
       final uid = _userData!.uid;
@@ -442,12 +465,63 @@ class UserProvider extends ChangeNotifier {
 
       await userRef.update({
         'totalSpins': FieldValue.increment(1),
+        'spinsRemaining': FieldValue.increment(1),
         'lastUpdated': FieldValue.serverTimestamp(),
       });
 
       notifyListeners();
     } catch (e) {
       _error = 'Failed to add bonus spin: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Reset spins for new day with lazy evaluation
+  /// CRITICAL: Resets spins only on new day when first spin is used
+  /// Prevents "stuck at 0 spins" bug on new day
+  Future<void> resetSpinsIfNewDay() async {
+    if (_userData == null) return;
+
+    try {
+      final now = DateTime.now();
+      final lastReset = _userData!.lastSpinResetDate ?? now;
+
+      // Check if today's date differs from last reset date
+      final isNewDay =
+          now.day != lastReset.day ||
+          now.month != lastReset.month ||
+          now.year != lastReset.year;
+
+      if (!isNewDay) {
+        return; // Same day, no reset needed
+      }
+
+      final uid = _userData!.uid;
+      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+
+      // Reset to 3 spins for new day
+      await userRef.update({
+        'spinsRemaining': 3, // ← Reset to 3, not increment
+        'lastSpinResetDate': FieldValue.serverTimestamp(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+
+      _userData!.spinsRemaining = 3;
+      _userData!.lastSpinResetDate = DateTime.now();
+
+      // Create audit trail
+      await userRef.collection('actions').add({
+        'type': 'DAILY_SPIN_RESET',
+        'newSpins': 3,
+        'timestamp': FieldValue.serverTimestamp(),
+        'userId': uid,
+      });
+
+      await LocalStorageService.saveUserData(_userData!);
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to reset spins: $e';
       notifyListeners();
       rethrow;
     }
