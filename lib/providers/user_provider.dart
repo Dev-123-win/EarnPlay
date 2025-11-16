@@ -311,4 +311,53 @@ class UserProvider extends ChangeNotifier {
       rethrow;
     }
   }
+
+  /// Claim spin reward with optional ad watch bonus
+  /// Decrements totalSpins and increments coins
+  Future<void> claimSpinReward(int coinAmount, {bool watchedAd = false}) async {
+    if (_userData == null) throw Exception('User not loaded');
+
+    try {
+      final uid = _userData!.uid;
+      final firestore = FirebaseFirestore.instance;
+      final userRef = firestore.collection('users').doc(uid);
+
+      // Use transaction to ensure atomicity
+      await firestore.runTransaction((transaction) async {
+        final userSnap = await transaction.get(userRef);
+        final currentSpins = (userSnap['totalSpins'] as int?) ?? 0;
+
+        if (currentSpins <= 0) {
+          throw Exception('No spins remaining');
+        }
+
+        // Update user with coins and spin decrement
+        transaction.update(userRef, {
+          'coins': FieldValue.increment(coinAmount),
+          'totalSpins': FieldValue.increment(-1),
+          'lastSpinTime': Timestamp.now(),
+          'lastUpdated': Timestamp.now(),
+        });
+
+        // Record transaction
+        await userRef.collection('spin_transactions').add({
+          'amount': coinAmount,
+          'watchedAd': watchedAd,
+          'timestamp': Timestamp.now(),
+        });
+      });
+
+      // Update local data
+      _userData!.coins += coinAmount;
+      _userData!.totalSpins = (_userData!.totalSpins - 1).clamp(0, spinsPerDay);
+      await LocalStorageService.saveUserData(_userData!);
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to claim spin reward: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
 }
+
+const int spinsPerDay = 3;

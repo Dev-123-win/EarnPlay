@@ -48,7 +48,10 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
           // Add coins when reward is earned
           try {
             await userProvider.updateCoins(coinsPerAd);
-            
+
+            // Increment watched ads counter
+            await userProvider.incrementWatchedAds();
+
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -56,7 +59,9 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                     children: [
                       const Icon(Icons.check_circle, color: Colors.white),
                       const SizedBox(width: 12),
-                      Text('🎁 Earned $coinsPerAd coins! Total: ${reward.amount}'),
+                      Text(
+                        '🎁 Earned $coinsPerAd coins! Total: ${reward.amount}',
+                      ),
                     ],
                   ),
                   backgroundColor: Colors.green,
@@ -116,7 +121,12 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                 child: Center(
                   child: Row(
                     children: [
-                      const Icon(Icons.monetization_on, size: 20),
+                      Image.asset(
+                        'coin.png',
+                        width: 20,
+                        height: 20,
+                        fit: BoxFit.contain,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         '${userProvider.userData?.coins ?? 0}',
@@ -177,9 +187,9 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                   const SizedBox(height: 8),
                   Text(
                     'Watch real ads to earn coins!',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.grey),
                   ),
                   const SizedBox(height: 16),
                   ...List.generate(remaining, (index) {
@@ -187,6 +197,7 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                     return _buildAdCard(
                       adNumber: adNumber,
                       onWatch: () => _watchAd(adNumber - 1),
+                      isDisabled: false,
                     );
                   }),
                 ] else ...[
@@ -224,7 +235,11 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
     );
   }
 
-  Widget _buildAdCard({required int adNumber, required VoidCallback onWatch}) {
+  Widget _buildAdCard({
+    required int adNumber,
+    required VoidCallback onWatch,
+    required bool isDisabled,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Card(
@@ -236,13 +251,17 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: Colors.purple.shade100,
+                  color: isDisabled
+                      ? Colors.grey.shade200
+                      : Colors.purple.shade100,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
                   child: Icon(
-                    Icons.video_library,
-                    color: Colors.purple.shade700,
+                    isDisabled ? Icons.lock : Icons.video_library,
+                    color: isDisabled
+                        ? Colors.grey.shade600
+                        : Colors.purple.shade700,
                     size: 32,
                   ),
                 ),
@@ -257,24 +276,29 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     Text(
-                      'Watch to earn $coinsPerAd coins',
-                      style: Theme.of(context).textTheme.bodySmall,
+                      isDisabled
+                          ? 'Daily limit reached'
+                          : 'Watch to earn $coinsPerAd coins',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isDisabled ? Colors.grey : null,
+                      ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      '🎥 Real ads from advertisers',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Colors.green,
-                            fontStyle: FontStyle.italic,
-                          ),
-                    ),
+                    if (!isDisabled)
+                      Text(
+                        '🎥 Real ads from advertisers',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Colors.green,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
                   ],
                 ),
               ),
               FilledButton.icon(
-                onPressed: onWatch,
-                icon: const Icon(Icons.play_arrow),
-                label: const Text('Watch'),
+                onPressed: isDisabled ? null : onWatch,
+                icon: Icon(isDisabled ? Icons.lock : Icons.play_arrow),
+                label: Text(isDisabled ? 'Locked' : 'Watch'),
               ),
             ],
           ),

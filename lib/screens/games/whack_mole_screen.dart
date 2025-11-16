@@ -64,7 +64,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen> {
     });
 
     moleTimer = Timer(
-      Duration(milliseconds: 800 + math.Random().nextInt(700)),
+      Duration(milliseconds: 600 + math.Random().nextInt(600)),
       () {
         if (isGameActive) {
           setState(() {

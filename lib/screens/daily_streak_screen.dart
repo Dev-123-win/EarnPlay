@@ -180,7 +180,7 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.bold,
                                                   color: isToday
-                                                      ? Colors.white
+                                                      ? colorScheme.onPrimary
                                                       : colorScheme.onSurface,
                                                 ),
                                               ),
@@ -350,7 +350,7 @@ class _DailyStreakScreenState extends State<DailyStreakScreen> {
                     ),
                   ],
                 ),
-                if (isClaimed || isToday || isLocked)
+                if (isClaimed || isLocked)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,

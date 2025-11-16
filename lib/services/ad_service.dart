@@ -123,7 +123,7 @@ class AdService {
     }
 
     try {
-      _bannerAd = BannerAd(
+      final newBannerAd = BannerAd(
         adUnitId: bannerAdId,
         size: AdSize.banner,
         request: const AdRequest(),
@@ -136,6 +136,12 @@ class AdService {
             // print('❌ Banner Ad failed to load: $error'); // Removed print
             ad.dispose();
             _isBannerAdReady = false;
+            // Retry loading after delay
+            Future.delayed(const Duration(seconds: 2), () {
+              if (_bannerAd == ad) {
+                loadBannerAdRetry();
+              }
+            });
           },
           onAdOpened: (ad) {
             // print('📖 Banner Ad opened'); // Removed print
@@ -146,11 +152,44 @@ class AdService {
         ),
       );
 
-      _bannerAd!.load();
-      return _bannerAd;
+      _bannerAd = newBannerAd;
+      newBannerAd.load();
+      return newBannerAd;
     } catch (e) {
       // print('❌ Error creating Banner Ad: $e'); // Removed print
       return null;
+    }
+  }
+
+  /// Retry loading banner ad after failure
+  Future<void> loadBannerAdRetry() async {
+    if (!_isInitialized) return;
+
+    try {
+      await Future.delayed(const Duration(seconds: 2));
+      final newBannerAd = BannerAd(
+        adUnitId: bannerAdId,
+        size: AdSize.banner,
+        request: const AdRequest(),
+        listener: BannerAdListener(
+          onAdLoaded: (ad) {
+            _isBannerAdReady = true;
+            // print('✅ Banner Ad loaded on retry'); // Removed print
+          },
+          onAdFailedToLoad: (ad, error) {
+            // print('❌ Banner Ad failed to load on retry: $error'); // Removed print
+            ad.dispose();
+            _isBannerAdReady = false;
+          },
+          onAdOpened: (ad) {},
+          onAdClosed: (ad) {},
+        ),
+      );
+
+      _bannerAd = newBannerAd;
+      newBannerAd.load();
+    } catch (e) {
+      // print('❌ Error retrying Banner Ad: $e'); // Removed print
     }
   }
 
@@ -184,6 +223,10 @@ class AdService {
           onAdFailedToLoad: (error) {
             // print('❌ Interstitial Ad failed to load: $error'); // Removed print
             _interstitialAd = null;
+            // Retry on failure
+            Future.delayed(const Duration(seconds: 2), () {
+              loadInterstitialAd();
+            });
           },
         ),
       );
@@ -241,6 +284,10 @@ class AdService {
           onAdFailedToLoad: (error) {
             // print('❌ Rewarded Ad failed to load: $error'); // Removed print
             _rewardedAd = null;
+            // Retry on failure
+            Future.delayed(const Duration(seconds: 2), () {
+              loadRewardedAd();
+            });
           },
         ),
       );
@@ -312,6 +359,10 @@ class AdService {
           onAdFailedToLoad: (error) {
             // print('❌ Rewarded Interstitial Ad failed to load: $error'); // Removed print
             _rewardedInterstitialAd = null;
+            // Retry on failure
+            Future.delayed(const Duration(seconds: 2), () {
+              loadRewardedInterstitialAd();
+            });
           },
         ),
       );

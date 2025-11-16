@@ -7,7 +7,6 @@ import '../providers/game_provider.dart';
 import '../services/firebase_service.dart';
 import '../services/ad_service.dart';
 import '../theme/app_theme.dart';
-import '../utils/dialog_helper.dart';
 import '../utils/currency_helper.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -47,24 +46,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _handleLogout() async {
-    final confirm = await DialogSystem.showConfirmationDialog(
-      context,
-      title: 'Logout?',
-      subtitle: 'Are you sure you want to logout?',
-      confirmText: 'Yes, Logout',
-      cancelText: 'Cancel',
-      isDangerous: true,
-    );
-
-    if (confirm == true && mounted) {
-      await FirebaseService().signOut();
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
-      }
-    }
-  }
-
   @override
   void dispose() {
     _adService.disposeBannerAd();
@@ -88,29 +69,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         centerTitle: true,
         actions: [
           IconButton(icon: const Icon(Iconsax.notification), onPressed: () {}),
-          PopupMenuButton(
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                child: const Row(
-                  children: [
-                    Icon(Iconsax.user),
-                    SizedBox(width: 12),
-                    Text('Profile'),
-                  ],
-                ),
-                onTap: () => Navigator.of(context).pushNamed('/profile'),
-              ),
-              PopupMenuItem(
-                onTap: _handleLogout,
-                child: const Row(
-                  children: [
-                    Icon(Iconsax.logout),
-                    SizedBox(width: 12),
-                    Text('Logout'),
-                  ],
-                ),
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Iconsax.user),
+            onPressed: () => Navigator.of(context).pushNamed('/profile'),
           ),
         ],
       ),
@@ -192,17 +153,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       ).textTheme.bodySmall,
                                     ),
                                     const SizedBox(height: 8),
-                                    CurrencyDisplay(
-                                      amount: '${userProvider.userData!.coins}',
-                                      coinSize: 32,
-                                      spacing: 8,
-                                      textStyle: Theme.of(context)
-                                          .textTheme
-                                          .headlineLarge
-                                          ?.copyWith(
-                                            color: colorScheme.primary,
-                                            fontWeight: FontWeight.w800,
-                                          ),
+                                    Flexible(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: CurrencyDisplay(
+                                          amount:
+                                              '${userProvider.userData!.coins}',
+                                          coinSize: 32,
+                                          spacing: 8,
+                                          textStyle: Theme.of(context)
+                                              .textTheme
+                                              .headlineLarge
+                                              ?.copyWith(
+                                                color: colorScheme.primary,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
