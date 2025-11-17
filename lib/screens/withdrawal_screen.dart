@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
@@ -110,7 +111,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // ========== BALANCE CARD ==========
+                // ========== BALANCE CARD WITH CONVERSION RATE ==========
                 Card(
                   elevation: 0,
                   color: colorScheme.primaryContainer,
@@ -138,7 +139,63 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 16),
+                        // Conversion rate clearly explained
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withAlpha(25),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: colorScheme.primary.withAlpha(50),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    '350 coins',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelMedium
+                                        ?.copyWith(fontWeight: FontWeight.w600),
+                                  ),
+                                  Text(
+                                    '=',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelMedium
+                                        ?.copyWith(color: colorScheme.primary),
+                                  ),
+                                  Text(
+                                    '₹1',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: colorScheme.primary,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'You have ₹${(user.coins / 350).toStringAsFixed(2)}',
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: colorScheme.onPrimaryContainer
+                                          .withAlpha(150),
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -149,7 +206,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            'Min. withdrawal: 500',
+                            'Min. withdrawal: 500 coins (₹1.43)',
                             style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(color: colorScheme.primary),
                           ),
@@ -173,9 +230,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Amount Field
+                        // Amount Field with validation
                         Text(
-                          'Withdrawal Amount',
+                          'Withdrawal Amount (coins)',
                           style: Theme.of(context).textTheme.labelMedium,
                         ),
                         const SizedBox(height: 8),
@@ -183,13 +240,22 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                           controller: _amountController,
                           enabled: !_isProcessing,
                           keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
                           decoration: InputDecoration(
-                            hintText: 'Enter amount',
+                            hintText: 'Min. 500 coins',
                             prefixIcon: const Icon(Iconsax.coin),
+                            suffixText: _amountController.text.isNotEmpty
+                                ? '(₹${(int.tryParse(_amountController.text) ?? 0) / 350.0})'
+                                : null,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
+                          onChanged: (value) {
+                            setState(() {});
+                          },
                         ),
                         const SizedBox(height: 20),
 
@@ -201,74 +267,57 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                         const SizedBox(height: 12),
 
                         // UPI Option
-                        InkWell(
-                          onTap: _isProcessing
-                              ? null
-                              : () {
-                                  setState(() => _selectedMethod = 'upi');
-                                },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: _selectedMethod == 'upi'
+                                  ? colorScheme.primary
+                                  : colorScheme.outline,
+                              width: 2,
                             ),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: _selectedMethod == 'upi'
-                                    ? colorScheme.primary
-                                    : colorScheme.outline,
-                                width: 2,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Radio.adaptive(
+                                value: 'upi',
+                                groupValue: _selectedMethod,
+                                onChanged: _isProcessing
+                                    ? null
+                                    : (String? value) {
+                                        if (value != null) {
+                                          setState(
+                                            () => _selectedMethod = value,
+                                          );
+                                        }
+                                      },
                               ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                Radio.adaptive(
-                                  value: 'upi',
-                                  groupValue: _selectedMethod,
-                                  onChanged: _isProcessing
-                                      ? null
-                                      : (String? value) {
-                                          if (value != null) {
-                                            setState(
-                                              () => _selectedMethod = value,
-                                            );
-                                          }
-                                        },
+                              Icon(Iconsax.mobile, color: colorScheme.primary),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: const [
+                                    Text('UPI'),
+                                    Text(
+                                      'Google Pay, PhonePe, Paytm',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                  ],
                                 ),
-                                Icon(
-                                  Iconsax.mobile,
-                                  color: colorScheme.primary,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: const [
-                                      Text('UPI'),
-                                      Text(
-                                        'Google Pay, PhonePe, etc.',
-                                        style: TextStyle(fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 12),
 
-                        // Bank Transfer Option
-                        InkWell(
-                          onTap: _isProcessing
-                              ? null
-                              : () {
-                                  setState(() => _selectedMethod = 'bank');
-                                },
-                          borderRadius: BorderRadius.circular(12),
+                        // Bank Transfer Option - Disabled with "Coming Soon"
+                        Opacity(
+                          opacity: 0.6,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -276,9 +325,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                             ),
                             decoration: BoxDecoration(
                               border: Border.all(
-                                color: _selectedMethod == 'bank'
-                                    ? colorScheme.primary
-                                    : colorScheme.outline,
+                                color: colorScheme.outline,
                                 width: 2,
                               ),
                               borderRadius: BorderRadius.circular(12),
@@ -288,25 +335,44 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                 Radio.adaptive(
                                   value: 'bank',
                                   groupValue: _selectedMethod,
-                                  onChanged: _isProcessing
-                                      ? null
-                                      : (String? value) {
-                                          if (value != null) {
-                                            setState(
-                                              () => _selectedMethod = value,
-                                            );
-                                          }
-                                        },
+                                  onChanged: null,
                                 ),
-                                Icon(Iconsax.bank, color: colorScheme.primary),
+                                Icon(Iconsax.bank, color: colorScheme.outline),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
-                                    children: const [
-                                      Text('Bank Transfer'),
-                                      Text(
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Text('Bank Transfer'),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: colorScheme.outlineVariant
+                                                  .withAlpha(100),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              'Coming Soon',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .labelSmall
+                                                  ?.copyWith(
+                                                    color: colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const Text(
                                         'Direct to bank account',
                                         style: TextStyle(fontSize: 12),
                                       ),
@@ -376,20 +442,32 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // ========== INFO BOX ==========
+                // ========== PROCESSING TIME - PROMINENT ==========
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: colorScheme.tertiaryContainer,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        colorScheme.errorContainer,
+                        colorScheme.errorContainer.withAlpha(180),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: colorScheme.error.withAlpha(100),
+                      width: 1,
+                    ),
                   ),
                   child: Column(
                     children: [
                       Row(
                         children: [
                           Icon(
-                            Iconsax.info_circle,
-                            color: colorScheme.tertiary,
+                            Iconsax.clock,
+                            color: colorScheme.error,
+                            size: 24,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -398,15 +476,20 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                               children: [
                                 Text(
                                   'Processing Time',
-                                  style: Theme.of(context).textTheme.labelSmall
+                                  style: Theme.of(context).textTheme.labelLarge
                                       ?.copyWith(
-                                        color: colorScheme.tertiary,
-                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.error,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                 ),
+                                const SizedBox(height: 4),
                                 Text(
-                                  '24-48 hours',
-                                  style: Theme.of(context).textTheme.bodySmall,
+                                  '24-48 hours after approval',
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(
+                                        color: colorScheme.onErrorContainer,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                 ),
                               ],
                             ),
@@ -417,93 +500,11 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // ========== RECENT WITHDRAWALS ==========
-                Text(
-                  'Recent Withdrawals',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 12),
-                Card(
-                  elevation: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        _buildWithdrawalItem(
-                          context,
-                          amount: '500',
-                          method: 'UPI (yourname@upi)',
-                          date: '12 Jan 2025',
-                          status: 'Completed',
-                          statusColor: colorScheme.tertiary,
-                        ),
-                        const SizedBox(height: 12),
-                        Divider(color: colorScheme.outline.withAlpha(77)),
-                        const SizedBox(height: 12),
-                        _buildWithdrawalItem(
-                          context,
-                          amount: '1000',
-                          method: 'UPI (yourname@upi)',
-                          date: '05 Jan 2025',
-                          status: 'Completed',
-                          statusColor: colorScheme.tertiary,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
               ],
             ),
           );
         },
       ),
-    );
-  }
-
-  Widget _buildWithdrawalItem(
-    BuildContext context, {
-    required String amount,
-    required String method,
-    required String date,
-    required String status,
-    required Color statusColor,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              amount,
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(method, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 4),
-            Text(date, style: Theme.of(context).textTheme.labelSmall),
-          ],
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: statusColor.withAlpha(51),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            status,
-            style: TextStyle(
-              color: statusColor,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

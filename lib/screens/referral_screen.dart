@@ -92,69 +92,57 @@ class _ReferralScreenState extends State<ReferralScreen> {
                     child: Column(
                       children: [
                         Text(
-                          '🎁 YOUR REFERRAL CODE',
-                          style: Theme.of(context).textTheme.labelLarge
+                          'Your Referral Code',
+                          style: Theme.of(context).textTheme.labelMedium
                               ?.copyWith(
-                                color: colorScheme.onSecondaryContainer,
+                                color: colorScheme.onSecondaryContainer
+                                    .withAlpha(180),
                               ),
                         ),
                         const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surface,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: colorScheme.secondary,
-                              width: 2,
-                            ),
-                          ),
-                          child: Text(
-                            user.referralCode,
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(
-                                  color: colorScheme.secondary,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 2,
-                                ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
+                        // Lightweight code display
+                        Column(
                           children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () {
-                                  Clipboard.setData(
-                                    ClipboardData(text: user.referralCode),
-                                  );
-                                  SnackbarHelper.showSuccess(
-                                    context,
-                                    'Code copied!',
-                                  );
-                                },
-                                icon: const Icon(Iconsax.copy),
-                                label: const Text('COPY'),
-                              ),
+                            Text(
+                              user.referralCode,
+                              style: Theme.of(context).textTheme.displaySmall
+                                  ?.copyWith(
+                                    color: colorScheme.secondary,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1,
+                                  ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FilledButton.icon(
-                                onPressed: () {
-                                  SnackbarHelper.showInfo(
-                                    context,
-                                    'Share functionality coming soon!',
-                                  );
-                                },
-                                icon: const Icon(Iconsax.share),
-                                label: const Text('SHARE'),
-                              ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Share this code with friends',
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: colorScheme.onSecondaryContainer
+                                        .withAlpha(150),
+                                  ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 20),
+                        // Single Copy button
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              Clipboard.setData(
+                                ClipboardData(text: user.referralCode),
+                              );
+                              SnackbarHelper.showSuccess(
+                                context,
+                                'Code copied to clipboard!',
+                              );
+                            },
+                            icon: const Icon(Iconsax.copy),
+                            label: const Text('Copy Code'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: colorScheme.secondary,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -163,67 +151,126 @@ class _ReferralScreenState extends State<ReferralScreen> {
                 const SizedBox(height: 24),
 
                 // ========== REFERRAL STATS ==========
-                Card(
-                  elevation: 0,
-                  color: colorScheme.tertiaryContainer,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '📊 Referral Stats',
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(
-                                color: colorScheme.onTertiaryContainer,
-                              ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        colorScheme.tertiaryContainer,
+                        colorScheme.tertiaryContainer.withAlpha(153),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: colorScheme.tertiary.withAlpha(77),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      // Show stats or encouragement based on referrals
+                      if (user.totalReferrals > 0)
+                        Column(
                           children: [
-                            Column(
-                              children: [
-                                Text(
-                                  'Friends',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${user.totalReferrals}',
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(
-                                        color: colorScheme.tertiary,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                              ],
+                            Text(
+                              'Referral Stats',
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    color: colorScheme.onTertiaryContainer
+                                        .withAlpha(180),
+                                  ),
                             ),
-                            Column(
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
                               children: [
-                                Text(
-                                  'Earned',
-                                  style: Theme.of(context).textTheme.bodySmall,
+                                Column(
+                                  children: [
+                                    Text(
+                                      'Friends',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: colorScheme
+                                                .onTertiaryContainer
+                                                .withAlpha(150),
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${user.totalReferrals}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .displaySmall
+                                          ?.copyWith(
+                                            color: colorScheme.tertiary,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 4),
-                                CurrencyDisplay(
-                                  amount: '${user.totalReferrals * 500}',
-                                  coinSize: 20,
-                                  spacing: 4,
-                                  textStyle: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(
-                                        color: colorScheme.tertiary,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                Column(
+                                  children: [
+                                    Text(
+                                      'Earned',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: colorScheme
+                                                .onTertiaryContainer
+                                                .withAlpha(150),
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    CurrencyDisplay(
+                                      amount: '${user.totalReferrals * 500}',
+                                      coinSize: 24,
+                                      spacing: 6,
+                                      textStyle: Theme.of(context)
+                                          .textTheme
+                                          .displaySmall
+                                          ?.copyWith(
+                                            color: colorScheme.tertiary,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                           ],
+                        )
+                      else
+                        Column(
+                          children: [
+                            Icon(
+                              Iconsax.people,
+                              size: 48,
+                              color: colorScheme.tertiary.withAlpha(150),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No referrals yet',
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Share your code to earn 500 per friend',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.onTertiaryContainer
+                                        .withAlpha(150),
+                                  ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -233,51 +280,55 @@ class _ReferralScreenState extends State<ReferralScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '🎁 Claim Referral Code',
-                      style: Theme.of(context).textTheme.titleSmall,
+                      'Have a referral code?',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 12),
-                    Card(
-                      elevation: 0,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            TextField(
-                              controller: _claimController,
-                              enabled: !_isLoading,
-                              decoration: InputDecoration(
-                                hintText: 'Enter code (e.g., ABC123XY)',
-                                prefixIcon: const Icon(Iconsax.code),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                    // Inline search-bar style
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _claimController,
+                            enabled: !_isLoading,
+                            decoration: InputDecoration(
+                              hintText: 'Enter code',
+                              prefixIcon: const Icon(Iconsax.code),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              textCapitalization: TextCapitalization.characters,
-                            ),
-                            const SizedBox(height: 16),
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton(
-                                onPressed: _isLoading ? null : _claimCode,
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                Colors.white,
-                                              ),
-                                        ),
-                                      )
-                                    : const Text('CLAIM CODE'),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 12,
                               ),
                             ),
-                          ],
+                            textCapitalization: TextCapitalization.characters,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        FilledButton(
+                          onPressed: _isLoading ? null : _claimCode,
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : const Text('Claim'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -289,14 +340,22 @@ class _ReferralScreenState extends State<ReferralScreen> {
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: colorScheme.primary.withAlpha(77),
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Iconsax.info_circle, color: colorScheme.primary),
+                      Icon(
+                        Iconsax.info_circle,
+                        color: colorScheme.primary,
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Earn 500 for each friend who signs up with your code!',
+                          'Earn 500 per friend who joins with your code',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),

@@ -165,7 +165,6 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
                     watchedAd: false,
                   );
                   if (mounted) {
-                    await userProvider.loadUserData(userProvider.userData!.uid);
                     Navigator.pop(context);
                     SnackbarHelper.showSuccess(
                       context,
@@ -277,8 +276,8 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
                   child: Column(
                     children: [
                       Text(
-                        'Spins Remaining',
-                        style: Theme.of(context).textTheme.titleMedium
+                        'Spins Remaining Today',
+                        style: Theme.of(context).textTheme.labelMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 16),
@@ -287,34 +286,15 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
                         children: List.generate(
                           spinsPerDay,
                           (index) => Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: index < spinsRemaining
-                                    ? colorScheme.error
-                                    : colorScheme.outline.withAlpha(64),
-                                boxShadow: index < spinsRemaining
-                                    ? [
-                                        BoxShadow(
-                                          color: colorScheme.error.withAlpha(
-                                            102,
-                                          ),
-                                          blurRadius: 8,
-                                          spreadRadius: 1,
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              child: Icon(
-                                Iconsax.heart,
-                                color: index < spinsRemaining
-                                    ? Colors.white
-                                    : colorScheme.outline,
-                                size: 24,
-                              ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Icon(
+                              index < spinsRemaining
+                                  ? Iconsax.heart5
+                                  : Iconsax.heart,
+                              color: index < spinsRemaining
+                                  ? colorScheme.error
+                                  : colorScheme.outline.withAlpha(100),
+                              size: 32,
                             ),
                           ),
                         ),
@@ -395,7 +375,7 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'You get 3 free spins daily.\nSpins reset at 22:00 IST.',
+                          'You get 3 free spins daily.\nSpins reset at 04:30 AM.',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: colorScheme.onTertiaryContainer,
@@ -403,142 +383,6 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
                               ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 28),
-
-                // ========== PRIZE BREAKDOWN HEADER ==========
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Prize Breakdown',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        '6 Prizes',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // ========== PRIZE LIST ==========
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: colorScheme.outline.withAlpha(64),
-                      width: 1,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      for (int i = 0; i < labels.length; i++) ...[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  emojis[i],
-                                  style: const TextStyle(fontSize: 20),
-                                ),
-                                const SizedBox(width: 12),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Image.asset(
-                                          'coin.png',
-                                          width: 16,
-                                          height: 16,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          labels[i],
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodyMedium
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w600,
-                                                color: colorScheme.primary,
-                                              ),
-                                        ),
-                                      ],
-                                    ),
-                                    Text(
-                                      'Prize #${i + 1}',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .labelSmall
-                                          ?.copyWith(
-                                            color: colorScheme.onSurface
-                                                .withAlpha(128),
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: rewardColors[rewards[i]]?.withAlpha(26),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color:
-                                      rewardColors[rewards[i]]?.withAlpha(
-                                        102,
-                                      ) ??
-                                      colorScheme.primary,
-                                  width: 1,
-                                ),
-                              ),
-                              child: Text(
-                                '1/6',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color:
-                                      rewardColors[rewards[i]] ??
-                                      colorScheme.primary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (i < labels.length - 1) ...[
-                          const SizedBox(height: 12),
-                          Divider(
-                            color: colorScheme.outline.withAlpha(64),
-                            height: 1,
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      ],
                     ],
                   ),
                 ),

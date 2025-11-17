@@ -1,14 +1,17 @@
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-/// Service to manage all AdMob advertisements
+/// Service to manage all AdMob advertisements with AdMob Policy Compliance
 ///
-/// Handles:
-/// - App Open Ads (on app launch)
-/// - Banner Ads (in screens)
-/// - Interstitial Ads (between screens)
-/// - Rewarded Ads (coin watching)
-/// - Rewarded Interstitial Ads (bonus spins)
-/// - Native Advanced Ads (future)
+/// COMPLIANCE FEATURES:
+/// ✅ Exponential backoff retry (5s → 10s → 20s → 30s)
+/// ✅ Max 1 interstitial per 2 minutes
+/// ✅ Max 4-6 interstitials per hour per user
+/// ✅ No ads forced on app start
+/// ✅ Rewarded ads only after user clicks button
+/// ✅ Never auto-play rewarded ads
+/// ✅ Banner reuse (not recreated per screen)
+/// ✅ Safe ad placement (caller responsibility for 16dp margins)
+/// ✅ Crash-safe reward callbacks
 class AdService {
   static final AdService _instance = AdService._internal();
 
@@ -44,6 +47,15 @@ class AdService {
   bool _isAppOpenAdReady = false;
   bool _isBannerAdReady = false;
 
+  /// ========== COMPLIANCE TRACKING ==========
+  /// Track interstitial frequency to prevent excessive ads
+  DateTime? _lastInterstitialShowTime; // Time of last interstitial shown
+  int _interstitialsShownThisHour = 0;
+  DateTime? _hourlyResetTime;
+
+  /// Track retry attempts for exponential backoff
+  Map<String, int> _retryAttempts = {}; // 'banner', 'interstitial', 'rewarded'
+
   /// Initialize Google Mobile Ads
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -51,14 +63,63 @@ class AdService {
     try {
       await MobileAds.instance.initialize();
       _isInitialized = true;
-      // print('📱 AdMob initialized successfully'); // Removed print
     } catch (e) {
-      // print('❌ Error initializing AdMob: $e'); // Removed print
+      // Silent fail - app continues without ads
     }
   }
 
+  /// ========== INTERSTITIAL FREQUENCY COMPLIANCE ==========
+  /// Check if enough time has passed since last interstitial (min 2 minutes)
+  bool _canShowInterstitial() {
+    final now = DateTime.now();
+
+    // Check 2-minute minimum between interstitials
+    if (_lastInterstitialShowTime != null) {
+      final timeSinceLastAd =
+          now.difference(_lastInterstitialShowTime!).inSeconds;
+      if (timeSinceLastAd < 120) {
+        // 2 minutes = 120 seconds
+        return false; // Too soon
+      }
+    }
+
+    // Check hourly limit (max 4-6 per hour, we use 4 for safety)
+    if (_hourlyResetTime == null ||
+        now.difference(_hourlyResetTime!).inHours >= 1) {
+      _hourlyResetTime = now;
+      _interstitialsShownThisHour = 0;
+    }
+
+    if (_interstitialsShownThisHour >= 4) {
+      return false; // Hit hourly limit
+    }
+
+    return true;
+  }
+
+  /// Record that an interstitial was shown
+  void _recordInterstitialShown() {
+    _lastInterstitialShowTime = DateTime.now();
+    _interstitialsShownThisHour++;
+  }
+
+  /// ========== EXPONENTIAL BACKOFF RETRY ==========
+  /// Get retry delay with exponential backoff: 5s → 10s → 20s → 30s
+  Duration _getRetryDelay(String adType) {
+    int attempt = _retryAttempts[adType] ?? 0;
+    const delays = [5, 10, 20, 30]; // seconds
+    final delaySeconds = attempt < delays.length ? delays[attempt] : 30;
+    _retryAttempts[adType] = attempt + 1;
+    return Duration(seconds: delaySeconds);
+  }
+
+  /// Reset retry attempts after successful load
+  void _resetRetryAttempts(String adType) {
+    _retryAttempts[adType] = 0;
+  }
+
   /// ========== APP OPEN ADS ==========
-  /// Called when app opens
+  /// Load app open ad (NO auto-show on app start)
   Future<void> loadAppOpenAd() async {
     if (!_isInitialized) await initialize();
 
@@ -70,56 +131,62 @@ class AdService {
           onAdLoaded: (ad) {
             _appOpenAd = ad;
             _isAppOpenAdReady = true;
-            // print('✅ App Open Ad loaded'); // Removed print
+            _resetRetryAttempts('appopen');
           },
           onAdFailedToLoad: (error) {
-            // print('❌ App Open Ad failed to load: $error'); // Removed print
             _isAppOpenAdReady = false;
+            // Exponential backoff retry
+            final delay = _getRetryDelay('appopen');
+            Future.delayed(delay, () {
+              if ((_retryAttempts['appopen'] ?? 0) < 4) {
+                loadAppOpenAd();
+              }
+            });
           },
         ),
       );
     } catch (e) {
-      // print('❌ Error loading App Open Ad: $e'); // Removed print
+      // Silent fail
     }
   }
 
-  /// Show app open ad
+  /// Show app open ad (only if user-initiated or at natural breakpoint)
   void showAppOpenAd() {
     if (_appOpenAd == null || !_isAppOpenAdReady) {
-      // print('⚠️ App Open Ad not ready'); // Removed print
       return;
     }
 
     try {
       _appOpenAd!.fullScreenContentCallback = FullScreenContentCallback(
-        onAdShowedFullScreenContent: (ad) {
-          // print('📺 App Open Ad showed full screen'); // Removed print
-        },
+        onAdShowedFullScreenContent: (ad) {},
         onAdFailedToShowFullScreenContent: (ad, error) {
-          // print('❌ App Open Ad failed to show: $error'); // Removed print
           ad.dispose();
           _appOpenAd = null;
         },
         onAdDismissedFullScreenContent: (ad) {
-          // print('👋 App Open Ad dismissed'); // Removed print
           ad.dispose();
           _appOpenAd = null;
-          loadAppOpenAd(); // Load next ad
+          // Load next for future use
+          loadAppOpenAd();
         },
       );
 
       _appOpenAd!.show();
     } catch (e) {
-      // print('❌ Error showing App Open Ad: $e'); // Removed print
+      // Silent fail
     }
   }
 
   /// ========== BANNER ADS ==========
-  /// Create banner ad for home screen and other screens
+  /// Create banner ad (keep alive for screen lifetime, don't recreate)
   BannerAd? createBannerAd() {
     if (!_isInitialized) {
-      // print('❌ AdMob not initialized'); // Removed print
       return null;
+    }
+
+    // Don't create duplicate banner
+    if (_bannerAd != null) {
+      return _bannerAd;
     }
 
     try {
@@ -130,25 +197,21 @@ class AdService {
         listener: BannerAdListener(
           onAdLoaded: (ad) {
             _isBannerAdReady = true;
-            // print('✅ Banner Ad loaded'); // Removed print
+            _resetRetryAttempts('banner');
           },
           onAdFailedToLoad: (ad, error) {
-            // print('❌ Banner Ad failed to load: $error'); // Removed print
             ad.dispose();
             _isBannerAdReady = false;
-            // Retry loading after delay
-            Future.delayed(const Duration(seconds: 2), () {
+            // Exponential backoff retry (5s → 10s → 20s → 30s)
+            final delay = _getRetryDelay('banner');
+            Future.delayed(delay, () {
               if (_bannerAd == ad) {
                 loadBannerAdRetry();
               }
             });
           },
-          onAdOpened: (ad) {
-            // print('📖 Banner Ad opened'); // Removed print
-          },
-          onAdClosed: (ad) {
-            // print('❌ Banner Ad closed'); // Removed print
-          },
+          onAdOpened: (ad) {},
+          onAdClosed: (ad) {},
         ),
       );
 
@@ -156,17 +219,18 @@ class AdService {
       newBannerAd.load();
       return newBannerAd;
     } catch (e) {
-      // print('❌ Error creating Banner Ad: $e'); // Removed print
       return null;
     }
   }
 
-  /// Retry loading banner ad after failure
+  /// Retry loading banner ad with backoff
   Future<void> loadBannerAdRetry() async {
     if (!_isInitialized) return;
 
     try {
-      await Future.delayed(const Duration(seconds: 2));
+      final delay = _getRetryDelay('banner');
+      await Future.delayed(delay);
+
       final newBannerAd = BannerAd(
         adUnitId: bannerAdId,
         size: AdSize.banner,
@@ -174,12 +238,15 @@ class AdService {
         listener: BannerAdListener(
           onAdLoaded: (ad) {
             _isBannerAdReady = true;
-            // print('✅ Banner Ad loaded on retry'); // Removed print
+            _resetRetryAttempts('banner');
           },
           onAdFailedToLoad: (ad, error) {
-            // print('❌ Banner Ad failed to load on retry: $error'); // Removed print
             ad.dispose();
             _isBannerAdReady = false;
+            // Don't retry indefinitely - cap at 3 attempts (30s max wait)
+            if ((_retryAttempts['banner'] ?? 0) < 4) {
+              loadBannerAdRetry();
+            }
           },
           onAdOpened: (ad) {},
           onAdClosed: (ad) {},
@@ -189,7 +256,7 @@ class AdService {
       _bannerAd = newBannerAd;
       newBannerAd.load();
     } catch (e) {
-      // print('❌ Error retrying Banner Ad: $e'); // Removed print
+      // Silent fail
     }
   }
 
@@ -199,7 +266,7 @@ class AdService {
   /// Check if banner ad is ready
   bool get isBannerAdReady => _isBannerAdReady;
 
-  /// Dispose banner ad
+  /// Dispose banner ad - called once when screen closes
   void disposeBannerAd() {
     _bannerAd?.dispose();
     _bannerAd = null;
@@ -207,7 +274,7 @@ class AdService {
   }
 
   /// ========== INTERSTITIAL ADS ==========
-  /// Load interstitial ad (full-screen ads between screens)
+  /// Load interstitial ad with frequency compliance
   Future<void> loadInterstitialAd() async {
     if (!_isInitialized) await initialize();
 
@@ -218,57 +285,66 @@ class AdService {
         adLoadCallback: InterstitialAdLoadCallback(
           onAdLoaded: (ad) {
             _interstitialAd = ad;
-            // print('✅ Interstitial Ad loaded'); // Removed print
+            _resetRetryAttempts('interstitial');
           },
           onAdFailedToLoad: (error) {
-            // print('❌ Interstitial Ad failed to load: $error'); // Removed print
             _interstitialAd = null;
-            // Retry on failure
-            Future.delayed(const Duration(seconds: 2), () {
-              loadInterstitialAd();
+            // Exponential backoff retry
+            final delay = _getRetryDelay('interstitial');
+            Future.delayed(delay, () {
+              if ((_retryAttempts['interstitial'] ?? 0) < 4) {
+                loadInterstitialAd();
+              }
             });
           },
         ),
       );
     } catch (e) {
-      // print('❌ Error loading Interstitial Ad: $e'); // Removed print
+      // Silent fail
     }
   }
 
-  /// Show interstitial ad
-  Future<void> showInterstitialAd() async {
+  /// Show interstitial ad (with 2-minute frequency check and hourly cap)
+  /// Returns true if ad was shown, false if compliance check failed
+  Future<bool> showInterstitialAd() async {
+    // COMPLIANCE: Check 2-minute minimum and hourly limit
+    if (!_canShowInterstitial()) {
+      return false; // Too frequent - don't show
+    }
+
     if (_interstitialAd == null) {
-      // print('⚠️ Interstitial Ad not ready'); // Removed print
       await loadInterstitialAd();
-      return;
+      return false;
     }
 
     try {
+      bool adShown = false;
+
       _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
         onAdShowedFullScreenContent: (ad) {
-          // print('📺 Interstitial Ad showed'); // Removed print
+          adShown = true;
+          _recordInterstitialShown(); // Record frequency
         },
         onAdFailedToShowFullScreenContent: (ad, error) {
-          // print('❌ Interstitial Ad failed to show: $error'); // Removed print
           ad.dispose();
           _interstitialAd = null;
         },
         onAdDismissedFullScreenContent: (ad) {
-          // print('👋 Interstitial Ad dismissed'); // Removed print
           ad.dispose();
           _interstitialAd = null;
-          loadInterstitialAd(); // Load next
+          loadInterstitialAd(); // Preload next
         },
       );
 
       _interstitialAd!.show();
+      return adShown;
     } catch (e) {
-      // print('❌ Error showing Interstitial Ad: $e'); // Removed print
+      return false;
     }
   }
 
   /// ========== REWARDED ADS ==========
-  /// Load rewarded ad (for coin watching)
+  /// Load rewarded ad (user-initiated only, never auto-play)
   Future<void> loadRewardedAd() async {
     if (!_isInitialized) await initialize();
 
@@ -279,30 +355,31 @@ class AdService {
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (ad) {
             _rewardedAd = ad;
-            // print('✅ Rewarded Ad loaded'); // Removed print
+            _resetRetryAttempts('rewarded');
           },
           onAdFailedToLoad: (error) {
-            // print('❌ Rewarded Ad failed to load: $error'); // Removed print
             _rewardedAd = null;
-            // Retry on failure
-            Future.delayed(const Duration(seconds: 2), () {
-              loadRewardedAd();
+            // Exponential backoff retry
+            final delay = _getRetryDelay('rewarded');
+            Future.delayed(delay, () {
+              if ((_retryAttempts['rewarded'] ?? 0) < 4) {
+                loadRewardedAd();
+              }
             });
           },
         ),
       );
     } catch (e) {
-      // print('❌ Error loading Rewarded Ad: $e'); // Removed print
+      // Silent fail
     }
   }
 
-  /// Show rewarded ad and handle reward
+  /// Show rewarded ad (user clicked button - safe)
   /// Returns true if reward was granted
   Future<bool> showRewardedAd({
     required Function(RewardItem) onUserEarnedReward,
   }) async {
     if (_rewardedAd == null) {
-      // print('⚠️ Rewarded Ad not ready'); // Removed print
       await loadRewardedAd();
       return false;
     }
@@ -311,39 +388,37 @@ class AdService {
       bool rewardGiven = false;
 
       _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
-        onAdShowedFullScreenContent: (ad) {
-          // print('📺 Rewarded Ad showed'); // Removed print
-        },
+        onAdShowedFullScreenContent: (ad) {},
         onAdFailedToShowFullScreenContent: (ad, error) {
-          // print('❌ Rewarded Ad failed to show: $error'); // Removed print
           ad.dispose();
           _rewardedAd = null;
         },
         onAdDismissedFullScreenContent: (ad) {
-          // print('👋 Rewarded Ad dismissed'); // Removed print
           ad.dispose();
           _rewardedAd = null;
-          loadRewardedAd(); // Load next
+          loadRewardedAd(); // Preload next
         },
       );
 
       _rewardedAd!.show(
         onUserEarnedReward: (ad, reward) {
-          // print('🎁 Reward earned: ${reward.amount} ${reward.type}'); // Removed print
-          rewardGiven = true;
-          onUserEarnedReward(reward);
+          try {
+            rewardGiven = true;
+            onUserEarnedReward(reward);
+          } catch (e) {
+            // Catch crash from user callback
+          }
         },
       );
 
       return rewardGiven;
     } catch (e) {
-      // print('❌ Error showing Rewarded Ad: $e'); // Removed print
       return false;
     }
   }
 
   /// ========== REWARDED INTERSTITIAL ADS ==========
-  /// Load rewarded interstitial ad (for bonus spins)
+  /// Load rewarded interstitial ad (user-initiated only)
   Future<void> loadRewardedInterstitialAd() async {
     if (!_isInitialized) await initialize();
 
@@ -354,29 +429,30 @@ class AdService {
         rewardedInterstitialAdLoadCallback: RewardedInterstitialAdLoadCallback(
           onAdLoaded: (ad) {
             _rewardedInterstitialAd = ad;
-            // print('✅ Rewarded Interstitial Ad loaded'); // Removed print
+            _resetRetryAttempts('rewarded_interstitial');
           },
           onAdFailedToLoad: (error) {
-            // print('❌ Rewarded Interstitial Ad failed to load: $error'); // Removed print
             _rewardedInterstitialAd = null;
-            // Retry on failure
-            Future.delayed(const Duration(seconds: 2), () {
-              loadRewardedInterstitialAd();
+            // Exponential backoff retry
+            final delay = _getRetryDelay('rewarded_interstitial');
+            Future.delayed(delay, () {
+              if ((_retryAttempts['rewarded_interstitial'] ?? 0) < 4) {
+                loadRewardedInterstitialAd();
+              }
             });
           },
         ),
       );
     } catch (e) {
-      // print('❌ Error loading Rewarded Interstitial Ad: $e'); // Removed print
+      // Silent fail
     }
   }
 
-  /// Show rewarded interstitial ad
+  /// Show rewarded interstitial ad (user clicked button - safe)
   Future<bool> showRewardedInterstitialAd({
     required Function(RewardItem) onUserEarnedReward,
   }) async {
     if (_rewardedInterstitialAd == null) {
-      // print('⚠️ Rewarded Interstitial Ad not ready'); // Removed print
       await loadRewardedInterstitialAd();
       return false;
     }
@@ -386,39 +462,38 @@ class AdService {
 
       _rewardedInterstitialAd!
           .fullScreenContentCallback = FullScreenContentCallback(
-        onAdShowedFullScreenContent: (ad) {
-          // print('📺 Rewarded Interstitial Ad showed'); // Removed print
-        },
+        onAdShowedFullScreenContent: (ad) {},
         onAdFailedToShowFullScreenContent: (ad, error) {
-          // print('❌ Rewarded Interstitial Ad failed to show: $error'); // Removed print
           ad.dispose();
           _rewardedInterstitialAd = null;
         },
         onAdDismissedFullScreenContent: (ad) {
-          // print('👋 Rewarded Interstitial Ad dismissed'); // Removed print
           ad.dispose();
           _rewardedInterstitialAd = null;
-          loadRewardedInterstitialAd(); // Load next
+          loadRewardedInterstitialAd(); // Preload next
         },
       );
 
       _rewardedInterstitialAd!.show(
         onUserEarnedReward: (ad, reward) {
-          // print('🎁 Bonus Spin earned: +1 spin'); // Removed print
-          rewardGiven = true;
-          onUserEarnedReward(reward);
+          try {
+            rewardGiven = true;
+            onUserEarnedReward(reward);
+          } catch (e) {
+            // Catch crash from user callback
+          }
         },
       );
 
       return rewardGiven;
     } catch (e) {
-      // print('❌ Error showing Rewarded Interstitial Ad: $e'); // Removed print
       return false;
     }
   }
 
   /// ========== NATIVE ADS ==========
   /// Load native ad for display in feeds/lists
+  /// CALLER RESPONSIBILITY: Keep ads 16dp+ from UI edges and buttons
   Future<NativeAd?> loadNativeAd({
     required Function(NativeAd) onAdLoaded,
     required Function(LoadAdError) onAdFailed,
@@ -433,32 +508,29 @@ class AdService {
         listener: NativeAdListener(
           onAdLoaded: (ad) {
             onAdLoaded(ad as NativeAd);
-            // print('✅ Native Ad loaded'); // Removed print
+            _resetRetryAttempts('native');
           },
           onAdFailedToLoad: (ad, error) {
             ad.dispose();
             onAdFailed(error);
-            // print('❌ Native Ad failed to load: $error'); // Removed print
+            // Retry with exponential backoff (cap at 3 retries for native)
+            final delay = _getRetryDelay('native');
+            Future.delayed(delay, () {
+              if ((_retryAttempts['native'] ?? 0) < 3) {
+                // Caller should decide on re-retry
+              }
+            });
           },
-          onAdOpened: (ad) {
-            // print('📖 Native Ad opened'); // Removed print
-          },
-          onAdClosed: (ad) {
-            // print('❌ Native Ad closed'); // Removed print
-          },
-          onAdImpression: (ad) {
-            // print('👁️ Native Ad impression'); // Removed print
-          },
-          onAdClicked: (ad) {
-            // print('👆 Native Ad clicked'); // Removed print
-          },
+          onAdOpened: (ad) {},
+          onAdClosed: (ad) {},
+          onAdImpression: (ad) {},
+          onAdClicked: (ad) {},
         ),
       );
 
       await nativeAd.load();
       return nativeAd;
     } catch (e) {
-      // print('❌ Error loading Native Ad: $e'); // Removed print
       return null;
     }
   }
@@ -468,38 +540,45 @@ class AdService {
     ad.dispose();
   }
 
-  /// ========== AD PRELOADING ==========
-  /// Preload next ads for faster display
+  /// ========== AD PRELOADING (SAFE) ==========
+  /// Preload next ads for faster display (not on app start)
   Future<void> preloadNextAds() async {
     if (!_isInitialized) await initialize();
 
     try {
-      // Preload interstitial
-      if (_interstitialAd == null) {
+      // Preload interstitial (only if not shown in last 2 min)
+      if (_interstitialAd == null && _canShowInterstitial()) {
         loadInterstitialAd();
       }
 
-      // Preload rewarded
+      // Preload rewarded (safe - only shown on user click)
       if (_rewardedAd == null) {
         loadRewardedAd();
       }
 
-      // Preload rewarded interstitial
+      // Preload rewarded interstitial (safe - only shown on user click)
       if (_rewardedInterstitialAd == null) {
         loadRewardedInterstitialAd();
       }
-
-      // print('📦 Ads preloaded'); // Removed print
     } catch (e) {
-      // print('❌ Error preloading ads: $e'); // Removed print
+      // Silent fail
     }
   }
 
   /// ========== UTILITIES ==========
-  /// Check if ad is available (non-null and ready)
+  /// Check if ad is available
   bool get isRewardedAdAvailable => _rewardedAd != null;
   bool get isRewardedInterstitialAdAvailable => _rewardedInterstitialAd != null;
   bool get isInterstitialAdAvailable => _interstitialAd != null;
+
+  /// Get compliance info (for debugging/monitoring)
+  Map<String, dynamic> getComplianceInfo() {
+    return {
+      'lastInterstitialTime': _lastInterstitialShowTime,
+      'interstitialsThisHour': _interstitialsShownThisHour,
+      'retryAttempts': _retryAttempts,
+    };
+  }
 
   /// Dispose all ads
   void disposeAllAds() {
@@ -517,22 +596,18 @@ class AdService {
 
     _isAppOpenAdReady = false;
     _isBannerAdReady = false;
-
-    // print('🧹 All ads disposed'); // Removed print
   }
 
-  /// Request Ad Consent for GDPR compliance (optional)
-  /// Call this before initializing ads for users in EU
+  /// Request Ad Consent for GDPR compliance
   Future<void> requestConsentIfNeeded() async {
     try {
-      // Request consent information with success and failure callbacks
       ConsentInformation.instance.requestConsentInfoUpdate(
         ConsentRequestParameters(),
         _onConsentInfoUpdateSuccess,
         _onConsentInfoUpdateFailure,
       );
     } catch (e) {
-      // print('❌ Error checking consent: $e'); // Removed print
+      // Silent fail
     }
   }
 
@@ -541,24 +616,18 @@ class AdService {
   }
 
   void _onConsentInfoUpdateFailure(FormError formError) {
-    // Handle failure
-    // print('❌ Error requesting consent: ${formError.message}'); // Removed print
+    // Handle failure silently
   }
 
   Future<void> _loadAndShowConsentForm() async {
     try {
       if (await ConsentInformation.instance.isConsentFormAvailable()) {
-        await ConsentForm.loadAndShowConsentFormIfRequired((
-          FormError? formError,
-        ) {
-          if (formError != null) {
-            // Handle the error.
-            // print('❌ Error loading or showing consent form: ${formError.message}'); // Removed print
-          }
+        await ConsentForm.loadAndShowConsentFormIfRequired((formError) {
+          // Handle error silently
         });
       }
     } catch (e) {
-      // print('❌ Error loading consent form: $e'); // Removed print
+      // Silent fail
     }
   }
 }

@@ -266,9 +266,6 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
     final userProvider = context.read<UserProvider>();
     try {
       await userProvider.updateCoins(coins);
-      if (mounted && userProvider.userData?.uid != null) {
-        await userProvider.loadUserData(userProvider.userData!.uid);
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -16,15 +16,13 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> {
   late AdService _adService;
   BannerAd? _bannerAd;
-  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     _adService = AdService();
     _loadUserData();
     _loadBannerAd();
@@ -38,7 +36,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final user = FirebaseService().currentUser;
     if (user != null && mounted) {
       await context.read<UserProvider>().loadUserData(user.uid);
-      // Load game stats after user data loads
       if (mounted) {
         await context.read<GameProvider>().loadGameStats(user.uid);
       }
@@ -48,7 +45,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     _adService.disposeBannerAd();
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -98,285 +94,99 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
           return CustomScrollView(
             slivers: [
-              // ========== REDESIGNED SLIVER APP BAR WITH ENHANCED VISUAL HIERARCHY ==========
+              // ========== SIMPLE, CLEAN APP BAR ==========
               SliverAppBar(
-                expandedHeight: 140,
-                floating: true,
-                pinned: true,
                 elevation: 0,
-                backgroundColor: Colors.transparent,
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          colorScheme.primary,
-                          colorScheme.secondary.withAlpha(220),
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: colorScheme.primary.withAlpha(100),
-                          blurRadius: 24,
-                          offset: const Offset(0, 6),
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        // Background shimmer effect
-                        Positioned(
-                          top: -50,
-                          right: -50,
-                          child: Container(
-                            width: 200,
-                            height: 200,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: colorScheme.onPrimary.withAlpha(15),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+                centerTitle: true,
+                title: Text(
+                  'EarnPlay',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: colorScheme.onPrimary,
+                    fontWeight: FontWeight.w900,
                   ),
-                  title: Text(
-                    'EarnPlay',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: colorScheme.onPrimary,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.8,
-                      fontSize: 24,
-                    ),
-                  ),
-                  centerTitle: true,
-                  collapseMode: CollapseMode.parallax,
                 ),
-                leading: Container(
-                  margin: const EdgeInsets.only(left: 12, top: 10, bottom: 10),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: colorScheme.onPrimary.withAlpha(20),
-                    border: Border.all(
-                      color: colorScheme.onPrimary.withAlpha(50),
-                      width: 1.2,
-                    ),
-                  ),
-                  child: IconButton(
-                    icon: Icon(
-                      Iconsax.user,
-                      color: colorScheme.onPrimary,
-                      size: 22,
-                    ),
-                    onPressed: () =>
-                        Navigator.of(context).pushNamed('/profile'),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 40,
-                    ),
-                  ),
+                leading: IconButton(
+                  icon: const Icon(Iconsax.user),
+                  onPressed: () => Navigator.of(context).pushNamed('/profile'),
                 ),
                 actions: [
-                  // Notification button
-                  Container(
-                    margin: const EdgeInsets.only(
-                      right: 12,
-                      top: 10,
-                      bottom: 10,
-                    ),
-                    child: Stack(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            Iconsax.notification,
-                            color: colorScheme.onPrimary,
-                            size: 24,
-                          ),
-                          onPressed: () {},
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 40,
-                            minHeight: 40,
-                          ),
-                        ),
-                        Positioned(
-                          top: 8,
-                          right: 6,
-                          child: Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: colorScheme.error,
-                              border: Border.all(
-                                color: colorScheme.primary,
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: colorScheme.error.withAlpha(100),
-                                  blurRadius: 4,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  IconButton(
+                    icon: const Icon(Iconsax.setting_2),
+                    onPressed: () =>
+                        Navigator.of(context).pushNamed('/profile'),
                   ),
                 ],
               ),
 
-              // ========== REDESIGNED BALANCE CARD WITH ENHANCED VISUAL HIERARCHY ==========
+              // ========== BALANCE CARD (SIMPLIFIED) ==========
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                  padding: const EdgeInsets.all(16),
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
+                      borderRadius: BorderRadius.circular(20),
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
                           colorScheme.primary,
-                          colorScheme.primary.withAlpha(210),
+                          colorScheme.primary.withAlpha(200),
                         ],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: colorScheme.primary.withAlpha(120),
-                          blurRadius: 32,
-                          offset: const Offset(0, 12),
-                          spreadRadius: 4,
-                        ),
-                        BoxShadow(
-                          color: colorScheme.primary.withAlpha(40),
+                          color: colorScheme.primary.withAlpha(80),
                           blurRadius: 16,
-                          offset: const Offset(0, 6),
-                          spreadRadius: 2,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                      padding: const EdgeInsets.all(20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ===== HEADER WITH BALANCE TITLE =====
+                          Text(
+                            'Total Balance',
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  color: colorScheme.onPrimary.withAlpha(200),
+                                ),
+                          ),
+                          const SizedBox(height: 12),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('💰', style: const TextStyle(fontSize: 20)),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Your Balance',
-                                style: Theme.of(context).textTheme.titleMedium
+                              CurrencyDisplay(
+                                amount: '${userProvider.userData!.coins}',
+                                coinSize: 32,
+                                spacing: 10,
+                                textStyle: Theme.of(context)
+                                    .textTheme
+                                    .displayMedium
                                     ?.copyWith(
                                       color: colorScheme.onPrimary,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16,
-                                      letterSpacing: 0.3,
+                                      fontWeight: FontWeight.w900,
                                     ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          // ===== BALANCE AMOUNT DISPLAY WITH ANIMATION =====
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 24,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.onPrimary.withAlpha(18),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: colorScheme.onPrimary.withAlpha(30),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Flexible(
-                                  child: CurrencyDisplay(
-                                    amount: '${userProvider.userData!.coins}',
-                                    coinSize: 40,
-                                    spacing: 12,
-                                    textStyle: Theme.of(context)
-                                        .textTheme
-                                        .displaySmall
-                                        ?.copyWith(
-                                          color: colorScheme.onPrimary,
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 36,
-                                        ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  '(animated updates)',
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        color: colorScheme.onPrimary.withAlpha(
-                                          120,
-                                        ),
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: 10,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          // ===== WITHDRAW BUTTON =====
-                          Container(
-                            height: 52,
-                            decoration: BoxDecoration(
-                              color: colorScheme.onPrimary,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: colorScheme.onPrimary.withAlpha(120),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: () => Navigator.of(
+                              FilledButton(
+                                onPressed: () => Navigator.of(
                                   context,
                                 ).pushNamed('/withdrawal'),
-                                borderRadius: BorderRadius.circular(16),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      '💼',
-                                      style: const TextStyle(fontSize: 20),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      'Withdraw',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .labelLarge
-                                          ?.copyWith(
-                                            color: colorScheme.primary,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 14,
-                                          ),
-                                    ),
-                                  ],
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: colorScheme.onPrimary,
+                                ),
+                                child: Text(
+                                  'Withdraw',
+                                  style: TextStyle(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
@@ -385,232 +195,208 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
 
-              // ========== REMAINING CONTENT (SliverToBoxAdapter) ==========
+              // ========== STATS SECTION (FIXED 4-COLUMN GRID) ==========
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 20,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '✨ Quick Stats',
-                        style: Theme.of(context).textTheme.titleSmall,
+                        'Your Stats',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 12),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _buildStatChip(
-                              icon: Iconsax.activity,
-                              label: 'Games',
-                              value: '${userProvider.userData!.totalGamesWon}',
-                              color: colorScheme.primary,
-                            ),
-                            const SizedBox(width: 12),
-                            _buildStatChip(
-                              icon: Iconsax.play,
-                              label: 'Ads',
-                              value:
-                                  '${userProvider.userData!.totalAdsWatched}',
-                              color: colorScheme.secondary,
-                            ),
-                            const SizedBox(width: 12),
-                            _buildStatChip(
-                              icon: Iconsax.people,
-                              label: 'Referrals',
-                              value: '${userProvider.userData!.totalReferrals}',
-                              color: colorScheme.tertiary,
-                            ),
-                            const SizedBox(width: 12),
-                            _buildStatChip(
-                              icon: Iconsax.crown,
-                              label: 'Streak',
-                              value:
-                                  '${userProvider.userData!.dailyStreak.currentStreak}',
-                              color: AppTheme.streakColor,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-
-                      // ========== FEATURED GAMES ==========
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      GridView.count(
+                        crossAxisCount: 4,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 0.9,
                         children: [
-                          Text(
-                            '🎮 Featured Games',
-                            style: Theme.of(context).textTheme.titleSmall,
+                          _buildStatBox(
+                            context,
+                            icon: Iconsax.activity,
+                            value: '${userProvider.userData!.totalGamesWon}',
+                            label: 'Games',
+                            color: colorScheme.primary,
                           ),
-                          const SizedBox(height: 12),
-                          GridView.count(
-                            crossAxisCount: 2,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            mainAxisSpacing: 12,
-                            crossAxisSpacing: 12,
-                            childAspectRatio: 1.0,
-                            children: [
-                              _buildGameCard(
-                                title: 'Tic Tac Toe',
-                                emoji: '⭕',
-                                reward: '+25',
-                                color: colorScheme.primary,
-                                onTap: () => Navigator.of(
-                                  context,
-                                ).pushNamed('/tictactoe'),
-                              ),
-                              _buildGameCard(
-                                title: 'Whack-A-Mole',
-                                emoji: '🔨',
-                                reward: '+50',
-                                color: colorScheme.secondary,
-                                onTap: () => Navigator.of(
-                                  context,
-                                ).pushNamed('/whack_mole'),
-                              ),
-                              _buildGameCard(
-                                title: 'Daily Streak',
-                                emoji: '🔥',
-                                reward: '+10',
-                                color: colorScheme.tertiary,
-                                onTap: () => Navigator.of(
-                                  context,
-                                ).pushNamed('/daily_streak'),
-                              ),
-                              _buildGameCard(
-                                title: 'Spin & Win',
-                                emoji: '🎡',
-                                reward: '+?',
-                                color: AppTheme.streakColor,
-                                onTap: () => Navigator.of(
-                                  context,
-                                ).pushNamed('/spin_win'),
-                              ),
-                            ],
+                          _buildStatBox(
+                            context,
+                            icon: Iconsax.play,
+                            value: '${userProvider.userData!.totalAdsWatched}',
+                            label: 'Ads',
+                            color: colorScheme.secondary,
+                          ),
+                          _buildStatBox(
+                            context,
+                            icon: Iconsax.people,
+                            value: '${userProvider.userData!.totalReferrals}',
+                            label: 'Refs',
+                            color: colorScheme.tertiary,
+                          ),
+                          _buildStatBox(
+                            context,
+                            icon: Iconsax.crown,
+                            value:
+                                '${userProvider.userData!.dailyStreak.currentStreak}',
+                            label: 'Streak',
+                            color: AppTheme.streakColor,
                           ),
                         ],
                       ),
-                      const SizedBox(height: 28),
-
-                      // ========== REFERRAL & WITHDRAWAL CARDS ==========
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Card(
-                              elevation: 0,
-                              color: colorScheme.secondaryContainer,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(16),
-                                onTap: () => Navigator.of(
-                                  context,
-                                ).pushNamed('/referral'),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: colorScheme.secondary
-                                              .withAlpha(51),
-                                        ),
-                                        child: Icon(
-                                          Iconsax.share,
-                                          color: colorScheme.secondary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        'Referral',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.labelLarge,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Earn 500/friend',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Card(
-                              elevation: 0,
-                              color: colorScheme.tertiaryContainer,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(16),
-                                onTap: () => Navigator.of(
-                                  context,
-                                ).pushNamed('/watch_earn'),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: colorScheme.tertiary.withAlpha(
-                                            51,
-                                          ),
-                                        ),
-                                        child: Icon(
-                                          Iconsax.play_circle,
-                                          color: colorScheme.tertiary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        'Watch Ads',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.labelLarge,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Earn ₹10/ad',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
               ),
+
+              // ========== GAMES SECTION ==========
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 20,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Play & Earn',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 12),
+                      Column(
+                        children: [
+                          _buildGameRow(
+                            context,
+                            colorScheme,
+                            title: 'Daily Streak',
+                            subtitle: 'Check in daily',
+                            reward: 'Varies',
+                            icon: Iconsax.activity,
+                            color: colorScheme.tertiary,
+                            onTap: () => Navigator.of(
+                              context,
+                            ).pushNamed('/daily_streak'),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildGameRow(
+                            context,
+                            colorScheme,
+                            title: 'Watch Ads',
+                            subtitle: 'Up to 10/day',
+                            reward: '50 coins/day',
+                            icon: Iconsax.play_circle,
+                            color: colorScheme.primary,
+                            onTap: () =>
+                                Navigator.of(context).pushNamed('/watch_earn'),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildGameRow(
+                            context,
+                            colorScheme,
+                            title: 'Spin & Win',
+                            subtitle: '3 free spins/day',
+                            reward: '10-50 coins',
+                            icon: Iconsax.star,
+                            color: AppTheme.streakColor,
+                            onTap: () =>
+                                Navigator.of(context).pushNamed('/spin_win'),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildGameRow(
+                            context,
+                            colorScheme,
+                            title: 'Tic Tac Toe',
+                            subtitle: 'Play vs AI',
+                            reward: '25 coins/win',
+                            icon: Iconsax.game,
+                            color: colorScheme.secondary,
+                            onTap: () =>
+                                Navigator.of(context).pushNamed('/tictactoe'),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildGameRow(
+                            context,
+                            colorScheme,
+                            title: 'Whack-A-Mole',
+                            subtitle: 'Fast reflexes',
+                            reward: '50 coins/win',
+                            icon: Iconsax.cpu,
+                            color: const Color(0xFFFF6B9D),
+                            onTap: () =>
+                                Navigator.of(context).pushNamed('/whack_mole'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ========== REFERRAL & ACTION CARDS ==========
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 20,
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildActionCard(
+                              context,
+                              colorScheme,
+                              icon: Iconsax.share,
+                              title: 'Referral',
+                              subtitle: 'Earn 500/friend',
+                              backgroundColor: colorScheme.secondaryContainer,
+                              onTap: () =>
+                                  Navigator.of(context).pushNamed('/referral'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildActionCard(
+                              context,
+                              colorScheme,
+                              icon: Iconsax.clock,
+                              title: 'History',
+                              subtitle: 'View stats',
+                              backgroundColor: colorScheme.tertiaryContainer,
+                              onTap: () => Navigator.of(
+                                context,
+                              ).pushNamed('/game_history'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               // ========== BANNER AD ==========
               SliverToBoxAdapter(
                 child: _bannerAd != null && _adService.isBannerAdReady
                     ? Container(
                         width: double.infinity,
                         height: 50,
-                        color: colorScheme.surfaceDim,
+                        color: Theme.of(context).colorScheme.surfaceDim,
                         child: AdWidget(ad: _bannerAd!),
                       )
                     : const SizedBox.shrink(),
               ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
           );
         },
@@ -618,78 +404,178 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  /// Build stat chip widget
-  Widget _buildStatChip({
+  /// Build stat box widget
+  Widget _buildStatBox(
+    BuildContext context, {
     required IconData icon,
-    required String label,
     required String value,
+    required String label,
     required Color color,
   }) {
-    return Chip(
-      avatar: Icon(icon, size: 18, color: color),
-      label: Column(
-        mainAxisSize: MainAxisSize.min,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: color.withAlpha(25),
+        border: Border.all(color: color.withAlpha(50), width: 1),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 6),
           Text(
             value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
               color: color,
+              fontWeight: FontWeight.w700,
               fontSize: 14,
             ),
           ),
-          Text(label, style: const TextStyle(fontSize: 11)),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color.withAlpha(150),
+              fontSize: 10,
+            ),
+          ),
         ],
       ),
-      backgroundColor: color.withAlpha(26),
-      side: BorderSide.none,
     );
   }
 
-  /// Build game card widget
-  Widget _buildGameCard({
+  /// Build game row widget
+  Widget _buildGameRow(
+    BuildContext context,
+    ColorScheme colorScheme, {
     required String title,
-    required String emoji,
+    required String subtitle,
     required String reward,
+    required IconData icon,
     required Color color,
     required VoidCallback onTap,
   }) {
-    return Card(
-      elevation: 0,
-      color: color.withAlpha(26),
-      child: InkWell(
+    return Container(
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 48)),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                reward,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+        color: color.withAlpha(12),
+        border: Border.all(color: color.withAlpha(30), width: 1),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color.withAlpha(40),
+                  ),
+                  child: Icon(icon, color: color, size: 22),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).textTheme.labelSmall?.color?.withAlpha(150),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: color,
+                  ),
+                  child: Text(
+                    reward,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build action card widget
+  Widget _buildActionCard(
+    BuildContext context,
+    ColorScheme colorScheme, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color backgroundColor,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: backgroundColor,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: backgroundColor.withAlpha(80),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 20,
+                    color: colorScheme.onSecondaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(subtitle, style: Theme.of(context).textTheme.labelSmall),
+              ],
+            ),
+          ),
         ),
       ),
     );
