@@ -5,6 +5,8 @@ import '../providers/user_provider.dart';
 import '../services/firebase_service.dart';
 import '../utils/dialog_helper.dart';
 import '../utils/currency_helper.dart';
+import '../widgets/custom_app_bar.dart'; // Import CustomAppBar
+import 'auth/login_screen.dart'; // Added import for LoginScreen
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -31,9 +33,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       try {
         await FirebaseService().signOut();
         if (!mounted) return;
-        Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil('/login', (route) => false);
+        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
       } catch (e) {
         if (!mounted) return;
         SnackbarHelper.showError(context, 'Error: $e');
@@ -46,12 +49,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        elevation: 2,
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-        centerTitle: true,
+      appBar: const CustomAppBar(
+        title: 'Profile',
+        showBackButton: true,
       ),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, _) {
@@ -163,7 +163,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 CurrencyDisplay(
-                                  amount: '${user.coins}',
+                                  coins: user.coins,
                                   coinSize: 20,
                                   spacing: 4,
                                   textStyle: Theme.of(context)
@@ -173,6 +173,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         color: colorScheme.secondary,
                                         fontWeight: FontWeight.bold,
                                       ),
+                                  showRealCurrency: true,
                                 ),
                               ],
                             ),

@@ -285,10 +285,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                               valueColor: AlwaysStoppedAnimation<Color>(
                                 _passwordStrength == 1
-                                    ? Colors.red
+                                    ? colorScheme.error
                                     : _passwordStrength == 2
-                                    ? Colors.orange
-                                    : Colors.green,
+                                    ? colorScheme.secondary
+                                    : colorScheme.tertiary,
                               ),
                             ),
                           ),
@@ -303,10 +303,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             : 'Strong',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: _passwordStrength == 1
-                              ? Colors.red
+                              ? colorScheme.error
                               : _passwordStrength == 2
-                              ? Colors.orange
-                              : Colors.green,
+                              ? colorScheme.secondary
+                              : colorScheme.tertiary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

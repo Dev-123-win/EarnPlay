@@ -60,8 +60,12 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      // Simulate withdrawal processing
-      await Future.delayed(const Duration(seconds: 2));
+      // Call UserProvider to process withdrawal via Worker
+      await userProvider.requestWithdrawal(
+        amount: amount,
+        method: _selectedMethod.toUpperCase(),
+        paymentId: _upiController.text.trim(),
+      );
 
       if (mounted) {
         DialogSystem.showWithdrawalDialog(
@@ -130,7 +134,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                         ),
                         const SizedBox(height: 8),
                         CurrencyDisplay(
-                          amount: '${user.coins}',
+                          coins: user.coins,
                           coinSize: 28,
                           spacing: 8,
                           textStyle: Theme.of(context).textTheme.displaySmall
@@ -138,6 +142,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                 color: colorScheme.primary,
                                 fontWeight: FontWeight.bold,
                               ),
+                          showRealCurrency: true,
                         ),
                         const SizedBox(height: 16),
                         // Conversion rate clearly explained
@@ -158,7 +163,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    '350 coins',
+                                    '${CurrencyHelper.coinsPerRupee.toInt()} coins',
                                     style: Theme.of(context)
                                         .textTheme
                                         .labelMedium
@@ -172,7 +177,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                         ?.copyWith(color: colorScheme.primary),
                                   ),
                                   Text(
-                                    '₹1',
+                                    CurrencyHelper.convertCoinsToRealCurrency(
+                                      CurrencyHelper.coinsPerRupee.toInt(),
+                                    ),
                                     style: Theme.of(context)
                                         .textTheme
                                         .labelMedium
@@ -185,7 +192,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'You have ₹${(user.coins / 350).toStringAsFixed(2)}',
+                                'You have ${CurrencyHelper.convertCoinsToRealCurrency(user.coins)}',
                                 style: Theme.of(context).textTheme.labelSmall
                                     ?.copyWith(
                                       color: colorScheme.onPrimaryContainer
@@ -206,7 +213,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            'Min. withdrawal: 500 coins (₹1.43)',
+                            'Min. withdrawal: 500 coins (${CurrencyHelper.convertCoinsToRealCurrency(500)})',
                             style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(color: colorScheme.primary),
                           ),
@@ -247,7 +254,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                             hintText: 'Min. 500 coins',
                             prefixIcon: const Icon(Iconsax.coin),
                             suffixText: _amountController.text.isNotEmpty
-                                ? '(₹${(int.tryParse(_amountController.text) ?? 0) / 350.0})'
+                                ? '(${CurrencyHelper.convertCoinsToRealCurrency(int.tryParse(_amountController.text) ?? 0)})'
                                 : null,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),

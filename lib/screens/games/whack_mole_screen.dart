@@ -6,6 +6,8 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/game_provider.dart';
 import '../../services/ad_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/custom_app_bar.dart'; // Import CustomAppBar
 
 class WhackMoleScreen extends StatefulWidget {
   const WhackMoleScreen({super.key});
@@ -128,6 +130,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
   void _showGameResult() {
     final baseCoins = (score / 2).toInt().clamp(5, 100);
     final doubledCoins = baseCoins * 2;
+    final colorScheme = Theme.of(context).colorScheme; // Define colorScheme here
 
     showDialog(
       context: context,
@@ -149,7 +152,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
             Text(
               'Base Coins: $baseCoins 🎁',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.orange,
+                color: AppTheme.coinColor,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -157,15 +160,15 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.amber.shade50,
+                color: colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.amber.shade200),
+                border: Border.all(color: colorScheme.outlineVariant),
               ),
               child: Row(
                 children: [
                   Icon(
                     Icons.play_circle,
-                    color: Colors.amber.shade600,
+                    color: colorScheme.primary,
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -174,7 +177,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
                       'Watch an ad to double your reward!',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w500,
-                        color: Colors.amber.shade900,
+                        color: colorScheme.onPrimaryContainer,
                       ),
                     ),
                   ),
@@ -214,7 +217,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
                                 ),
                               ],
                             ),
-                            backgroundColor: Colors.green,
+                            backgroundColor: colorScheme.tertiary,
                             duration: const Duration(seconds: 3),
                           ),
                         );
@@ -224,7 +227,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Error updating coins: $e'),
-                            backgroundColor: Colors.red,
+                            backgroundColor: colorScheme.error,
                           ),
                         );
                       }
@@ -234,9 +237,9 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
                 if (!rewardGiven && mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Ad not ready. Try again later.'),
-                      backgroundColor: Colors.orange,
+                    SnackBar(
+                      content: const Text('Ad not ready. Try again later.'),
+                      backgroundColor: colorScheme.secondary,
                     ),
                   );
                 }
@@ -245,7 +248,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Error showing ad: $e'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: colorScheme.error,
                     ),
                   );
                 }
@@ -254,7 +257,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
             icon: const Icon(Icons.play_circle),
             label: Text('Watch Ad (2x = $doubledCoins)'),
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.amber.shade600,
+              backgroundColor: colorScheme.primary,
             ),
           ),
         ],
@@ -298,12 +301,9 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Whack a Mole'),
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-        elevation: 2,
-        centerTitle: true,
+      appBar: const CustomAppBar(
+        title: 'Whack a Mole',
+        showBackButton: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -476,10 +476,10 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
         ),
         child: Center(
           child: isActive
-              ? const Icon(
+              ? Icon(
                   Icons.sentiment_very_satisfied,
                   size: 48,
-                  color: Colors.amber,
+                  color: AppTheme.coinColor,
                 )
               : Icon(
                   Icons.circle,

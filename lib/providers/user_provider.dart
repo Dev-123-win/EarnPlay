@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_data_model.dart';
 import '../services/local_storage_service.dart';
 import '../services/firebase_service.dart';
+import '../services/worker_service.dart';
 
 class UserProvider extends ChangeNotifier {
   UserData? _userData;
@@ -210,8 +211,50 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  /// Request withdrawal using Firestore transaction (atomic operation)
+  /// Request withdrawal using Worker (optimized for Firestore cost)
+  /// Atomic transaction prevents double-spending
   Future<String> requestWithdrawal({
+    required int amount,
+    required String method,
+    required String paymentId,
+  }) async {
+    if (_userData == null) throw Exception('User not loaded');
+
+    try {
+      // ✅ Phase 1.5: Call Worker instead of direct Firestore update
+      final workerService = WorkerService();
+
+      // Call worker endpoint for atomic withdrawal
+      final result = await workerService.requestWithdrawal(
+        amount: amount,
+        method: method,
+        paymentId: paymentId,
+      );
+
+      if (result['success'] == true) {
+        // Update local state with worker response
+        final data = result['data'] as Map<String, dynamic>;
+
+        _userData!.coins = data['newBalance'] ?? _userData!.coins - amount;
+
+        // Cache locally
+        await LocalStorageService.saveUserData(_userData!);
+        notifyListeners();
+
+        return data['withdrawalId'] ?? '';
+      } else {
+        throw Exception('Worker returned success=false');
+      }
+    } catch (e) {
+      _error = 'Failed to request withdrawal: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Fallback: Request withdrawal using direct Firestore (not optimized)
+  /// ONLY USE IF WORKER IS DOWN
+  Future<String> requestWithdrawalFallback({
     required int amount,
     required String method,
     required String paymentId,
@@ -257,10 +300,7 @@ class UserProvider extends ChangeNotifier {
         });
 
         // Deduct coins from user (atomic)
-        transaction.update(userRef, {
-          'coins': FieldValue.increment(-amount),
-          'lastUpdated': FieldValue.serverTimestamp(),
-        });
+        transaction.update(userRef, {'coins': FieldValue.increment(-amount)});
 
         // Create audit trail for withdrawal
         transaction.set(userRef.collection('actions').doc(), {
@@ -298,9 +338,49 @@ class UserProvider extends ChangeNotifier {
     return digits.length >= 9 && digits.length <= 18;
   }
 
-  /// Process referral bonus using Firestore transaction (atomic)
-  /// Ensures referrer and new user both get their bonuses or neither does
+  /// Process referral bonus using Worker (optimized for Firestore cost)
+  /// Atomic transaction ensures referrer and new user both get bonuses or neither do
   Future<void> processReferral(String referralCode) async {
+    if (_userData == null) throw Exception('User not loaded');
+    if (_userData!.referredBy != null) {
+      throw Exception('You have already used a referral code');
+    }
+    if (referralCode == _userData!.referralCode) {
+      throw Exception('Cannot use your own referral code');
+    }
+
+    try {
+      // ✅ Phase 1.5: Call Worker instead of direct Firestore update
+      final workerService = WorkerService();
+
+      // Call worker endpoint for atomic referral claim
+      final result = await workerService.claimReferral(
+        referralCode: referralCode,
+      );
+
+      if (result['success'] == true) {
+        // Update local state with worker response
+        final data = result['data'] as Map<String, dynamic>;
+
+        _userData!.coins += (data['claimerBonus'] as num?)?.toInt() ?? 50;
+        _userData!.referredBy = referralCode;
+
+        // Cache locally
+        await LocalStorageService.saveUserData(_userData!);
+        notifyListeners();
+      } else {
+        throw Exception('Worker returned success=false');
+      }
+    } catch (e) {
+      _error = 'Failed to process referral: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Fallback: Process referral using direct Firestore (not optimized)
+  /// ONLY USE IF WORKER IS DOWN
+  Future<void> processReferralFallback(String referralCode) async {
     if (_userData == null) throw Exception('User not loaded');
     if (_userData!.referredBy != null) {
       throw Exception('You have already used a referral code');
@@ -344,7 +424,6 @@ class UserProvider extends ChangeNotifier {
         transaction.update(userRef, {
           'coins': FieldValue.increment(referralBonus),
           'referredBy': referralCode,
-          'lastUpdated': FieldValue.serverTimestamp(),
         });
 
         // Create audit trail for new user
@@ -360,7 +439,6 @@ class UserProvider extends ChangeNotifier {
         transaction.update(referrerRef, {
           'coins': FieldValue.increment(referralBonus),
           'totalReferrals': FieldValue.increment(1),
-          'lastUpdated': FieldValue.serverTimestamp(),
         });
 
         // Create audit trail for referrer
@@ -394,7 +472,47 @@ class UserProvider extends ChangeNotifier {
   /// CRITICAL: Checks if day changed before incrementing
   /// If new day, resets counter to 1 instead of incrementing from old value
   /// Prevents "can't watch ads on new day" bug when watchedAdsToday was at limit
-  Future<void> incrementWatchedAds(int coinsEarned) async {
+  Future<void> incrementWatchedAds(int coinsEarned, {String? adUnitId}) async {
+    if (_userData == null) return;
+
+    try {
+      // ✅ Phase 1: Call Worker instead of direct Firestore update
+      final workerService = WorkerService();
+
+      // Validate ad unit ID
+      if (adUnitId == null || adUnitId.isEmpty) {
+        throw Exception('Ad unit ID is required');
+      }
+
+      // Call worker endpoint for atomic verification & reward
+      final result = await workerService.verifyAdReward(adUnitId: adUnitId);
+
+      if (result['success'] == true) {
+        // Update local state with worker response
+        final data = result['data'] as Map<String, dynamic>;
+
+        _userData!.coins = data['newBalance'] ?? _userData!.coins + coinsEarned;
+        _userData!.watchedAdsToday =
+            data['adsWatchedToday'] ?? _userData!.watchedAdsToday + 1;
+        _userData!.totalAdsWatched += 1;
+        _userData!.lastAdResetDate = DateTime.now();
+
+        // Cache locally
+        await LocalStorageService.saveUserData(_userData!);
+        notifyListeners();
+      } else {
+        throw Exception('Worker returned success=false');
+      }
+    } catch (e) {
+      _error = 'Failed to claim ad reward: $e';
+      notifyListeners();
+      rethrow; // Re-throw so UI can handle the error
+    }
+  }
+
+  /// Fallback method: Direct Firestore update (if worker is unavailable)
+  /// ONLY USE FOR EMERGENCY FALLBACK - Uses direct writes (not optimized)
+  Future<void> incrementWatchedAdsFallback(int coinsEarned) async {
     if (_userData == null) return;
 
     try {
@@ -415,7 +533,6 @@ class UserProvider extends ChangeNotifier {
           'watchedAdsToday': 1, // ← Reset to 1, not increment
           'lastAdResetDate': FieldValue.serverTimestamp(),
           'coins': FieldValue.increment(coinsEarned),
-          'lastUpdated': FieldValue.serverTimestamp(),
         });
 
         _userData!.watchedAdsToday = 1;
@@ -425,7 +542,6 @@ class UserProvider extends ChangeNotifier {
         await userRef.update({
           'watchedAdsToday': FieldValue.increment(1),
           'coins': FieldValue.increment(coinsEarned),
-          'lastUpdated': FieldValue.serverTimestamp(),
         });
 
         _userData!.watchedAdsToday++;

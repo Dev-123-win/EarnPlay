@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
 import '../utils/dialog_helper.dart';
 import '../services/ad_service.dart';
+import '../widgets/custom_app_bar.dart'; // Import CustomAppBar
 
 class DailyStreakScreen extends StatefulWidget {
   const DailyStreakScreen({super.key});
@@ -126,59 +127,11 @@ class _DailyStreakScreenState extends State<DailyStreakScreen>
 
           return CustomScrollView(
             slivers: [
-              // ========== EXPRESSIVE APP BAR WITH GRADIENT ==========
-              SliverAppBar(
-                expandedHeight: 120,
-                floating: true,
-                pinned: true,
-                elevation: 0,
-                backgroundColor: Colors.transparent,
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          colorScheme.primary,
-                          colorScheme.primary.withAlpha(180),
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: colorScheme.primary.withAlpha(100),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '🔥 Daily Streak',
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(
-                                  color: colorScheme.onPrimary,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Claim daily rewards & build your streak',
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(
-                                  color: colorScheme.onPrimary.withAlpha(200),
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  collapseMode: CollapseMode.parallax,
+              // ========== CUSTOM APP BAR ==========
+              SliverToBoxAdapter(
+                child: CustomAppBar(
+                  title: 'Daily Streak',
+                  showBackButton: true,
                 ),
               ),
 

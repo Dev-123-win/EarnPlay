@@ -8,6 +8,7 @@ import 'home_screen.dart';
 import 'daily_streak_screen.dart';
 import 'watch_earn_screen.dart';
 import 'profile_screen.dart';
+import '../widgets/app_navigator.dart'; // Import AppNavigator
 
 /// Main app shell with persistent BottomNavigationBar
 /// This replaces the old navigation system and provides smooth transitions
@@ -21,6 +22,12 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   late PageController _pageController;
   int _currentIndex = 0;
+
+  // GlobalKeys for nested navigators
+  final GlobalKey<NavigatorState> _homeTabNavigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<NavigatorState> _dailyStreakTabNavigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<NavigatorState> _watchEarnTabNavigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<NavigatorState> _profileTabNavigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -66,10 +73,22 @@ class _AppShellState extends State<AppShell> {
           });
         },
         children: [
-          HomeScreen(),
-          const DailyStreakScreen(),
-          const WatchEarnScreen(),
-          const ProfileScreen(),
+          AppNavigator(
+            navigatorKey: _homeTabNavigatorKey,
+            child: HomeScreen(),
+          ),
+          AppNavigator(
+            navigatorKey: _dailyStreakTabNavigatorKey,
+            child: const DailyStreakScreen(),
+          ),
+          AppNavigator(
+            navigatorKey: _watchEarnTabNavigatorKey,
+            child: const WatchEarnScreen(),
+          ),
+          AppNavigator(
+            navigatorKey: _profileTabNavigatorKey,
+            child: const ProfileScreen(),
+          ),
         ],
       ),
       bottomNavigationBar: Container(

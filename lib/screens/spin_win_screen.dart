@@ -8,6 +8,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../providers/user_provider.dart';
 import '../utils/dialog_helper.dart';
 import '../services/ad_service.dart';
+import '../widgets/custom_app_bar.dart'; // Import CustomAppBar
 
 class SpinWinScreen extends StatefulWidget {
   const SpinWinScreen({super.key});
@@ -130,15 +131,15 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(color: colorScheme.outlineVariant),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       Iconsax.play_circle,
-                      color: Colors.orange.shade600,
+                      color: colorScheme.primary,
                       size: 20,
                     ),
                     const SizedBox(width: 12),
@@ -147,7 +148,7 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
                         'Watch an ad to double your reward!',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w500,
-                          color: Colors.orange.shade900,
+                          color: colorScheme.onPrimaryContainer,
                         ),
                       ),
                     ),
@@ -226,7 +227,7 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
               icon: const Icon(Iconsax.play_circle),
               label: const Text('Watch Ad'),
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.orange.shade600,
+                backgroundColor: colorScheme.primary,
               ),
             ),
           ],
@@ -240,12 +241,9 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Spin & Win'),
-        elevation: 2,
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-        centerTitle: true,
+      appBar: const CustomAppBar(
+        title: 'Spin & Win',
+        showBackButton: true,
       ),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, _) {
@@ -437,7 +435,7 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
         FortuneIndicator(
           alignment: Alignment.topCenter,
           child: TriangleIndicator(
-            color: Colors.red,
+            color: colorScheme.error,
             width: 25,
             height: 35,
             elevation: 8,

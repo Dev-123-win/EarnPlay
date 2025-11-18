@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
 import '../services/ad_service.dart';
 import '../utils/currency_helper.dart';
+import '../widgets/custom_app_bar.dart'; // Import CustomAppBar
 
 class WatchEarnScreen extends StatefulWidget {
   const WatchEarnScreen({super.key});
@@ -37,16 +38,19 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
     super.dispose();
   }
 
-  Future<void> _watchAd(int adIndex) async {
+  Future<void> _watchAd(int adIndex, ColorScheme colorScheme) async {
     final userProvider = context.read<UserProvider>();
     final watched = userProvider.userData?.watchedAdsToday ?? 0;
 
     if (watched >= maxAdsPerDay) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Daily limit reached. Come back tomorrow!'),
-            backgroundColor: Colors.orange,
+          SnackBar(
+            content: Text(
+              'Daily limit reached. Come back tomorrow!',
+              style: TextStyle(color: colorScheme.onSecondaryContainer),
+            ),
+            backgroundColor: colorScheme.secondaryContainer,
           ),
         );
       }
@@ -57,19 +61,31 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
       bool rewardGiven = await _adService.showRewardedAd(
         onUserEarnedReward: (RewardItem reward) async {
           try {
-            await userProvider.incrementWatchedAds(coinsPerAd);
+            // ✅ Phase 1: Pass adUnitId to worker
+            await userProvider.incrementWatchedAds(
+              coinsPerAd,
+              adUnitId: AdService.rewardedAdId, // Pass the ad unit ID
+            );
 
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Row(
                     children: [
-                      const Icon(Icons.check_circle, color: Colors.white),
+                      Icon(
+                        Icons.check_circle,
+                        color: colorScheme.onTertiaryContainer,
+                      ),
                       const SizedBox(width: 12),
-                      Text('Earned $coinsPerAd coins!'),
+                      Text(
+                        'Earned $coinsPerAd coins!',
+                        style: TextStyle(
+                          color: colorScheme.onTertiaryContainer,
+                        ),
+                      ),
                     ],
                   ),
-                  backgroundColor: Colors.green,
+                  backgroundColor: colorScheme.tertiaryContainer,
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -78,8 +94,11 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Error: $e'),
-                  backgroundColor: Colors.red,
+                  content: Text(
+                    'Error: $e',
+                    style: TextStyle(color: colorScheme.onErrorContainer),
+                  ),
+                  backgroundColor: colorScheme.errorContainer,
                 ),
               );
             }
@@ -89,16 +108,25 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
 
       if (!rewardGiven && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ad not ready. Try again in a moment.'),
-            backgroundColor: Colors.orange,
+          SnackBar(
+            content: Text(
+              'Ad not ready. Try again in a moment.',
+              style: TextStyle(color: colorScheme.onSecondaryContainer),
+            ),
+            backgroundColor: colorScheme.secondaryContainer,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(
+              'Error: $e',
+              style: TextStyle(color: colorScheme.onErrorContainer),
+            ),
+            backgroundColor: colorScheme.errorContainer,
+          ),
         );
       }
     }
@@ -109,19 +137,7 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-        title: Text(
-          'Watch Ads',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: colorScheme.onPrimary,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        centerTitle: true,
-      ),
+      appBar: const CustomAppBar(title: 'Watch Ads', showBackButton: true),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, _) {
           final watched = userProvider.userData?.watchedAdsToday ?? 0;
@@ -191,8 +207,7 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       CurrencyDisplay(
-                                        amount:
-                                            '${watched * coinsPerAd}/${maxAdsPerDay * coinsPerAd}',
+                                        coins: watched * coinsPerAd,
                                         coinSize: 16,
                                         spacing: 6,
                                         textStyle: Theme.of(context)
@@ -202,6 +217,7 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                                               color: colorScheme.onPrimary,
                                               fontWeight: FontWeight.w600,
                                             ),
+                                        showRealCurrency: true,
                                       ),
                                     ],
                                   ),
@@ -292,7 +308,7 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                         children: [
                           _buildAdCard(
                             adNumber: adNumber,
-                            onWatch: () => _watchAd(adNumber - 1),
+                            onWatch: () => _watchAd(adNumber - 1, colorScheme),
                           ),
                           const SizedBox(height: 12),
                           // Native ad every 3 cards
@@ -335,7 +351,7 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                           ),
                           const SizedBox(height: 12),
                           CurrencyDisplay(
-                            amount: '${watched * coinsPerAd}',
+                            coins: watched * coinsPerAd,
                             coinSize: 24,
                             spacing: 8,
                             textStyle: Theme.of(context).textTheme.titleLarge
@@ -343,6 +359,7 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                                   color: colorScheme.primary,
                                   fontWeight: FontWeight.w700,
                                 ),
+                            showRealCurrency: true,
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -430,7 +447,7 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                       ),
                       const SizedBox(height: 2),
                       CurrencyDisplay(
-                        amount: '$coinsPerAd',
+                        coins: coinsPerAd,
                         coinSize: 14,
                         spacing: 4,
                         textStyle: Theme.of(context).textTheme.labelSmall
@@ -438,6 +455,7 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                               color: colorScheme.primary,
                               fontWeight: FontWeight.w600,
                             ),
+                        showRealCurrency: false,
                       ),
                     ],
                   ),

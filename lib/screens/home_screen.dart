@@ -8,6 +8,16 @@ import '../services/firebase_service.dart';
 import '../services/ad_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/currency_helper.dart';
+import '../widgets/custom_app_bar.dart'; // Import CustomAppBar
+import 'profile_screen.dart'; // Added import
+import 'withdrawal_screen.dart'; // Added import
+import 'daily_streak_screen.dart'; // Added import
+import 'watch_earn_screen.dart'; // Added import
+import 'spin_win_screen.dart'; // Added import
+import 'games/tictactoe_screen.dart'; // Added import
+import 'games/whack_mole_screen.dart'; // Added import
+import 'referral_screen.dart'; // Added import
+import 'game_history_screen.dart'; // Added import
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -94,30 +104,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
           return CustomScrollView(
             slivers: [
-              // ========== SIMPLE, CLEAN APP BAR ==========
-              SliverAppBar(
-                elevation: 0,
-                backgroundColor: colorScheme.primary,
-                foregroundColor: colorScheme.onPrimary,
-                centerTitle: true,
-                title: Text(
-                  'EarnPlay',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: colorScheme.onPrimary,
-                    fontWeight: FontWeight.w900,
-                  ),
+              // ========== CUSTOM APP BAR ==========
+              SliverToBoxAdapter(
+                child: CustomAppBar(
+                  title: 'EarnPlay',
+                  showBackButton: false, // Home screen is the root of its tab
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Iconsax.user),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Iconsax.setting_2),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const ProfileScreen()), // Assuming settings is part of profile
+                      ),
+                    ),
+                  ],
                 ),
-                leading: IconButton(
-                  icon: const Icon(Iconsax.user),
-                  onPressed: () => Navigator.of(context).pushNamed('/profile'),
-                ),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Iconsax.setting_2),
-                    onPressed: () =>
-                        Navigator.of(context).pushNamed('/profile'),
-                  ),
-                ],
               ),
 
               // ========== BALANCE CARD (SIMPLIFIED) ==========
@@ -160,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               CurrencyDisplay(
-                                amount: '${userProvider.userData!.coins}',
+                                coins: userProvider.userData!.coins,
                                 coinSize: 32,
                                 spacing: 10,
                                 textStyle: Theme.of(context)
@@ -170,11 +176,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                       color: colorScheme.onPrimary,
                                       fontWeight: FontWeight.w900,
                                     ),
+                                showRealCurrency: true, // Show real currency on home screen
                               ),
                               FilledButton(
-                                onPressed: () => Navigator.of(
-                                  context,
-                                ).pushNamed('/withdrawal'),
+                                onPressed: () => Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (context) => const WithdrawalScreen()),
+                                ),
                                 style: FilledButton.styleFrom(
                                   backgroundColor: colorScheme.onPrimary,
                                 ),
@@ -194,66 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-
-              // ========== STATS SECTION (FIXED 4-COLUMN GRID) ==========
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 20,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Your Stats',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 12),
-                      GridView.count(
-                        crossAxisCount: 4,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 0.9,
-                        children: [
-                          _buildStatBox(
-                            context,
-                            icon: Iconsax.activity,
-                            value: '${userProvider.userData!.totalGamesWon}',
-                            label: 'Games',
-                            color: colorScheme.primary,
-                          ),
-                          _buildStatBox(
-                            context,
-                            icon: Iconsax.play,
-                            value: '${userProvider.userData!.totalAdsWatched}',
-                            label: 'Ads',
-                            color: colorScheme.secondary,
-                          ),
-                          _buildStatBox(
-                            context,
-                            icon: Iconsax.people,
-                            value: '${userProvider.userData!.totalReferrals}',
-                            label: 'Refs',
-                            color: colorScheme.tertiary,
-                          ),
-                          _buildStatBox(
-                            context,
-                            icon: Iconsax.crown,
-                            value:
-                                '${userProvider.userData!.dailyStreak.currentStreak}',
-                            label: 'Streak',
-                            color: AppTheme.streakColor,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)), // Added spacing
 
               // ========== GAMES SECTION ==========
               SliverToBoxAdapter(
@@ -278,12 +226,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             colorScheme,
                             title: 'Daily Streak',
                             subtitle: 'Check in daily',
-                            reward: 'Varies',
+                            rewardWidget: _buildRewardChip(context, 'Varies', colorScheme.tertiary),
                             icon: Iconsax.activity,
                             color: colorScheme.tertiary,
-                            onTap: () => Navigator.of(
-                              context,
-                            ).pushNamed('/daily_streak'),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (context) => const DailyStreakScreen()),
+                            ),
+                            boxShadow: BoxShadow(
+                              color: colorScheme.tertiary.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
                           ),
                           const SizedBox(height: 12),
                           _buildGameRow(
@@ -291,11 +244,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             colorScheme,
                             title: 'Watch Ads',
                             subtitle: 'Up to 10/day',
-                            reward: '50 coins/day',
+                            rewardWidget: _buildRewardChip(context, '50 coins/day', colorScheme.primary),
                             icon: Iconsax.play_circle,
                             color: colorScheme.primary,
-                            onTap: () =>
-                                Navigator.of(context).pushNamed('/watch_earn'),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (context) => const WatchEarnScreen()),
+                            ),
+                            boxShadow: BoxShadow(
+                              color: colorScheme.primary.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
                           ),
                           const SizedBox(height: 12),
                           _buildGameRow(
@@ -303,11 +262,25 @@ class _HomeScreenState extends State<HomeScreen> {
                             colorScheme,
                             title: 'Spin & Win',
                             subtitle: '3 free spins/day',
-                            reward: '10-50 coins',
+                            rewardWidget: _buildRewardChip(context, '10-50 coins', AppTheme.streakColor),
                             icon: Iconsax.star,
                             color: AppTheme.streakColor,
-                            onTap: () =>
-                                Navigator.of(context).pushNamed('/spin_win'),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (context) => const SpinWinScreen()),
+                            ),
+                            boxShadow: BoxShadow(
+                              color: AppTheme.streakColor.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                AppTheme.streakColor.withAlpha(12),
+                                AppTheme.streakColor.withAlpha(24),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 12),
                           _buildGameRow(
@@ -315,11 +288,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             colorScheme,
                             title: 'Tic Tac Toe',
                             subtitle: 'Play vs AI',
-                            reward: '25 coins/win',
+                            rewardWidget: _buildRewardChip(context, '25 coins/win', colorScheme.secondary),
                             icon: Iconsax.game,
                             color: colorScheme.secondary,
-                            onTap: () =>
-                                Navigator.of(context).pushNamed('/tictactoe'),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (context) => const TicTacToeScreen()),
+                            ),
+                            boxShadow: BoxShadow(
+                              color: colorScheme.secondary.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
                           ),
                           const SizedBox(height: 12),
                           _buildGameRow(
@@ -327,11 +306,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             colorScheme,
                             title: 'Whack-A-Mole',
                             subtitle: 'Fast reflexes',
-                            reward: '50 coins/win',
+                            rewardWidget: _buildRewardChip(context, '50 coins/win', colorScheme.primaryContainer),
                             icon: Iconsax.cpu,
-                            color: const Color(0xFFFF6B9D),
-                            onTap: () =>
-                                Navigator.of(context).pushNamed('/whack_mole'),
+                            color: colorScheme.primaryContainer,
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (context) => const WhackMoleScreen()),
+                            ),
+                            boxShadow: BoxShadow(
+                              color: colorScheme.primaryContainer.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
                           ),
                         ],
                       ),
@@ -339,6 +324,69 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)), // Added spacing
+
+              // ========== STATS SECTION (FIXED 4-COLUMN GRID) ==========
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 20,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your Stats',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 120, // Fixed height for horizontal scroll
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: [
+                            _buildStatBox(
+                              context,
+                              icon: Iconsax.activity,
+                              value: '${userProvider.userData!.totalGamesWon}',
+                              label: 'Games Won',
+                              color: colorScheme.primary,
+                            ),
+                            const SizedBox(width: 12),
+                            _buildStatBox(
+                              context,
+                              icon: Iconsax.play,
+                              value: '${userProvider.userData!.totalAdsWatched}',
+                              label: 'Ads Watched',
+                              color: colorScheme.secondary,
+                            ),
+                            const SizedBox(width: 12),
+                            _buildStatBox(
+                              context,
+                              icon: Iconsax.people,
+                              value: '${userProvider.userData!.totalReferrals}',
+                              label: 'Referrals',
+                              color: colorScheme.tertiary,
+                            ),
+                            const SizedBox(width: 12),
+                            _buildStatBox(
+                              context,
+                              icon: Iconsax.crown,
+                              value:
+                                  '${userProvider.userData!.dailyStreak.currentStreak}',
+                            label: 'Daily Streak',
+                            color: AppTheme.streakColor,
+                          ),
+                        ],
+                      ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)), // Added spacing
 
               // ========== REFERRAL & ACTION CARDS ==========
               SliverToBoxAdapter(
@@ -359,8 +407,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               title: 'Referral',
                               subtitle: 'Earn 500/friend',
                               backgroundColor: colorScheme.secondaryContainer,
-                              onTap: () =>
-                                  Navigator.of(context).pushNamed('/referral'),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (context) => const ReferralScreen()),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -372,9 +421,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               title: 'History',
                               subtitle: 'View stats',
                               backgroundColor: colorScheme.tertiaryContainer,
-                              onTap: () => Navigator.of(
-                                context,
-                              ).pushNamed('/game_history'),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (context) => const GameHistoryScreen()),
+                              ),
                             ),
                           ),
                         ],
@@ -383,15 +432,29 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)), // Added spacing
 
               // ========== BANNER AD ==========
               SliverToBoxAdapter(
                 child: _bannerAd != null && _adService.isBannerAdReady
-                    ? Container(
-                        width: double.infinity,
-                        height: 50,
-                        color: Theme.of(context).colorScheme.surfaceDim,
-                        child: AdWidget(ad: _bannerAd!),
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                        child: Container(
+                          width: double.infinity,
+                          height: 60, // Slightly increased height for better visibility
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainer,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: colorScheme.shadow.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: AdWidget(ad: _bannerAd!),
+                        ),
                       )
                     : const SizedBox.shrink(),
               ),
@@ -413,33 +476,35 @@ class _HomeScreenState extends State<HomeScreen> {
     required Color color,
   }) {
     return Container(
+      width: 120, // Fixed width for horizontal scroll
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         color: color.withAlpha(25),
         border: Border.all(color: color.withAlpha(50), width: 1),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color.withAlpha(150),
-              fontSize: 10,
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: color.withAlpha(180),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -450,16 +515,20 @@ class _HomeScreenState extends State<HomeScreen> {
     ColorScheme colorScheme, {
     required String title,
     required String subtitle,
-    required String reward,
+    required Widget rewardWidget, // Changed to Widget
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    BoxShadow? boxShadow,
+    Gradient? gradient, // Added gradient parameter
   }) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: color.withAlpha(12),
+        color: gradient == null ? color.withAlpha(12) : null,
+        gradient: gradient,
         border: Border.all(color: color.withAlpha(30), width: 1),
+        boxShadow: boxShadow != null ? [boxShadow] : null,
       ),
       child: Material(
         color: Colors.transparent,
@@ -502,23 +571,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: color,
-                  ),
-                  child: Text(
-                    reward,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+                rewardWidget, // Use the rewardWidget here
               ],
             ),
           ),
@@ -576,6 +629,28 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Build reward chip widget
+  Widget _buildRewardChip(BuildContext context, String reward, Color color) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: color,
+      ),
+      child: Text(
+        reward,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: colorScheme.onPrimary,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
 import '../utils/dialog_helper.dart';
 import '../utils/currency_helper.dart';
+import '../widgets/custom_app_bar.dart'; // Import CustomAppBar
 
 class ReferralScreen extends StatefulWidget {
   const ReferralScreen({super.key});
@@ -64,12 +65,9 @@ class _ReferralScreenState extends State<ReferralScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Referral & Earn'),
-        elevation: 2,
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-        centerTitle: true,
+      appBar: const CustomAppBar(
+        title: 'Referral & Earn',
+        showBackButton: true,
       ),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, _) {
@@ -227,7 +225,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     CurrencyDisplay(
-                                      amount: '${user.totalReferrals * 500}',
+                                      coins: user.totalReferrals * 500,
                                       coinSize: 24,
                                       spacing: 6,
                                       textStyle: Theme.of(context)
@@ -237,6 +235,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
                                             color: colorScheme.tertiary,
                                             fontWeight: FontWeight.w900,
                                           ),
+                                      showRealCurrency: true,
                                     ),
                                   ],
                                 ),

@@ -54,7 +54,7 @@ class AdService {
   DateTime? _hourlyResetTime;
 
   /// Track retry attempts for exponential backoff
-  Map<String, int> _retryAttempts = {}; // 'banner', 'interstitial', 'rewarded'
+  final Map<String, int> _retryAttempts = {}; // 'banner', 'interstitial', 'rewarded'
 
   /// Initialize Google Mobile Ads
   Future<void> initialize() async {

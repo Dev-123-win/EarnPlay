@@ -5,6 +5,7 @@ import '../../providers/user_provider.dart';
 import '../../providers/game_provider.dart';
 import '../../utils/animation_helper.dart';
 import '../../services/ad_service.dart';
+import '../../widgets/custom_app_bar.dart'; // Import CustomAppBar
 
 class TicTacToeScreen extends StatefulWidget {
   const TicTacToeScreen({super.key});
@@ -252,15 +253,15 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
+                  color: colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber.shade200),
+                  border: Border.all(color: colorScheme.outlineVariant),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       Icons.play_circle,
-                      color: Colors.amber.shade600,
+                      color: colorScheme.primary,
                       size: 20,
                     ),
                     const SizedBox(width: 12),
@@ -269,7 +270,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
                         'Watch an ad to double your reward!',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w500,
-                          color: Colors.amber.shade900,
+                          color: colorScheme.onPrimaryContainer,
                         ),
                       ),
                     ),
@@ -317,7 +318,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
                                   ),
                                 ],
                               ),
-                              backgroundColor: Colors.green,
+                              backgroundColor: colorScheme.tertiary,
                               duration: const Duration(seconds: 3),
                             ),
                           );
@@ -328,7 +329,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Error updating coins: $e'),
-                              backgroundColor: Colors.red,
+                              backgroundColor: colorScheme.error,
                             ),
                           );
                         }
@@ -338,9 +339,9 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
                   if (!rewardGiven && mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Ad not ready. Try again later.'),
-                        backgroundColor: Colors.orange,
+                      SnackBar(
+                        content: const Text('Ad not ready. Try again later.'),
+                        backgroundColor: colorScheme.secondary,
                       ),
                     );
                     setState(() => _initializeGame());
@@ -350,7 +351,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Error showing ad: $e'),
-                        backgroundColor: Colors.red,
+                        backgroundColor: colorScheme.error,
                       ),
                     );
                   }
@@ -359,7 +360,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
               icon: const Icon(Icons.play_circle),
               label: Text('Watch Ad (2x = $doubledCoinsWon)'),
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.amber.shade600,
+                backgroundColor: colorScheme.primary,
               ),
             ),
           ] else ...[
@@ -408,12 +409,9 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tic Tac Toe'),
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-        elevation: 2,
-        centerTitle: true,
+      appBar: const CustomAppBar(
+        title: 'Tic Tac Toe',
+        showBackButton: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -510,7 +508,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
                 const SizedBox(width: 12),
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.arrow_back),
                     label: const Text('Exit'),
                     style: FilledButton.styleFrom(
