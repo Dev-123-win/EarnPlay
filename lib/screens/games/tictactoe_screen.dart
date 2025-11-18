@@ -5,7 +5,8 @@ import '../../providers/user_provider.dart';
 import '../../providers/game_provider.dart';
 import '../../utils/animation_helper.dart';
 import '../../services/ad_service.dart';
-import '../../widgets/custom_app_bar.dart'; // Import CustomAppBar
+import '../../services/navigation_service.dart';
+import '../../widgets/custom_app_bar.dart';
 
 class TicTacToeScreen extends StatefulWidget {
   const TicTacToeScreen({super.key});
@@ -284,7 +285,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
           if (showAdOption) ...[
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                AppRouter().goBack();
                 setState(() => _initializeGame());
               },
               child: Text('Claim $coinsWon'),
@@ -303,7 +304,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
                           );
                         }
                         if (mounted) {
-                          Navigator.pop(context);
+                          AppRouter().goBack();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Row(
@@ -337,7 +338,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
                     },
                   );
                   if (!rewardGiven && mounted) {
-                    Navigator.pop(context);
+                    AppRouter().goBack();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: const Text('Ad not ready. Try again later.'),
@@ -366,14 +367,14 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
           ] else ...[
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                AppRouter().goBack();
                 setState(() => _initializeGame());
               },
               child: const Text('Play Again'),
             ),
           ],
           FilledButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => AppRouter().goBack(),
             child: const Text('Exit'),
           ),
         ],
@@ -409,10 +410,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: const CustomAppBar(
-        title: 'Tic Tac Toe',
-        showBackButton: true,
-      ),
+      appBar: const CustomAppBar(title: 'Tic Tac Toe', showBackButton: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

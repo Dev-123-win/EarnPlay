@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../services/firebase_service.dart';
+import '../../services/navigation_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -155,7 +156,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/home');
+        await AppRouter().goToHome();
       }
     } catch (e) {
       if (mounted) {
@@ -176,7 +177,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         content: Text(message),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => AppRouter().goBack(),
             child: const Text('OK'),
           ),
         ],
@@ -518,7 +519,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       onPressed: _isLoading
                           ? null
                           : () {
-                              Navigator.of(context).pop();
+                              AppRouter().goBack();
                             },
                       child: Text(
                         'Sign In',

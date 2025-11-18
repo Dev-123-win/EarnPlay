@@ -205,20 +205,6 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                                               fontWeight: FontWeight.w900,
                                             ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      CurrencyDisplay(
-                                        coins: watched * coinsPerAd,
-                                        coinSize: 16,
-                                        spacing: 6,
-                                        textStyle: Theme.of(context)
-                                            .textTheme
-                                            .labelLarge
-                                            ?.copyWith(
-                                              color: colorScheme.onPrimary,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                        showRealCurrency: true,
-                                      ),
                                     ],
                                   ),
                                   // Circular progress indicator
@@ -446,16 +432,25 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      CurrencyDisplay(
-                        coins: coinsPerAd,
-                        coinSize: 14,
-                        spacing: 4,
-                        textStyle: Theme.of(context).textTheme.labelSmall
-                            ?.copyWith(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                        showRealCurrency: false,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Image.asset(
+                            'coin.png',
+                            height: 14,
+                            width: 14,
+                            fit: BoxFit.contain,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '+ $coinsPerAd coins',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

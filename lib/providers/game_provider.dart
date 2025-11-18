@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/game_models.dart';
 
 class GameProvider extends ChangeNotifier {
   // ============================================
@@ -12,6 +13,12 @@ class GameProvider extends ChangeNotifier {
   bool _isGameActive = false;
   String? _error;
   bool _statsLoaded = false;
+
+  // ============================================
+  // LOCAL GAME HISTORY (in-memory session data)
+  // Shows games played in current session
+  // ============================================
+  final List<GameResult> _localGameHistory = [];
 
   // ============================================
   // SESSION BATCHING (in-memory accumulation)
@@ -32,6 +39,7 @@ class GameProvider extends ChangeNotifier {
   bool get statsLoaded => _statsLoaded;
   int get sessionGamesPlayed => _sessionGamesPlayed;
   int get sessionCoinsEarned => _sessionCoinsEarned;
+  List<GameResult> get localGameHistory => _localGameHistory;
 
   /// Load game stats from Firestore (monthly aggregates)
   Future<void> loadGameStats(String uid) async {
@@ -89,6 +97,33 @@ class GameProvider extends ChangeNotifier {
     }
     _sessionCoinsEarned += coinsEarned;
 
+    notifyListeners();
+  }
+
+  /// Add a game result to local history (for game history screen)
+  /// Called when a game completes
+  void addGameResultToHistory({
+    required String gameName,
+    required bool isWon,
+    required int coinsEarned,
+    required int durationSeconds,
+  }) {
+    final gameResult = GameResult(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      gameName: gameName,
+      isWon: isWon,
+      coinsEarned: coinsEarned,
+      playedAt: DateTime.now(),
+      duration: durationSeconds,
+    );
+
+    _localGameHistory.insert(0, gameResult); // Add to top of list
+    notifyListeners();
+  }
+
+  /// Clear local game history (call when user logs out or session ends)
+  void clearGameHistory() {
+    _localGameHistory.clear();
     notifyListeners();
   }
 

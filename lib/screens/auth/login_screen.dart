@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../services/firebase_service.dart';
-import 'register_screen.dart';
+import '../../services/navigation_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -73,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/home');
+        await AppRouter().goToHome();
       }
     } catch (e) {
       if (mounted) {
@@ -93,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await FirebaseService().signInWithGoogle();
 
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/home');
+        await AppRouter().goToHome();
       }
     } catch (e) {
       if (mounted) {
@@ -114,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
         content: Text(message),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => AppRouter().goBack(),
             child: const Text('OK'),
           ),
         ],
@@ -337,12 +337,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextButton(
                       onPressed: _isLoading
                           ? null
-                          : () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const RegisterScreen(),
-                                ),
-                              );
+                          : () async {
+                              await AppRouter().goToRegister();
                             },
                       child: Text(
                         'Create Account',

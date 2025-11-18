@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
 import '../services/firebase_service.dart';
+import '../services/navigation_service.dart';
 import '../utils/dialog_helper.dart';
 import '../utils/currency_helper.dart';
-import '../widgets/custom_app_bar.dart'; // Import CustomAppBar
-import 'auth/login_screen.dart'; // Added import for LoginScreen
+import '../widgets/custom_app_bar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -33,10 +33,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       try {
         await FirebaseService().signOut();
         if (!mounted) return;
-        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
+        await AppRouter().logout();
       } catch (e) {
         if (!mounted) return;
         SnackbarHelper.showError(context, 'Error: $e');
@@ -49,10 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: const CustomAppBar(
-        title: 'Profile',
-        showBackButton: true,
-      ),
+      appBar: const CustomAppBar(title: 'Profile', showBackButton: true),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, _) {
           final user = userProvider.userData;

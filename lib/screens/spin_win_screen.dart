@@ -8,7 +8,8 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../providers/user_provider.dart';
 import '../utils/dialog_helper.dart';
 import '../services/ad_service.dart';
-import '../widgets/custom_app_bar.dart'; // Import CustomAppBar
+import '../services/navigation_service.dart';
+import '../widgets/custom_app_bar.dart';
 
 class SpinWinScreen extends StatefulWidget {
   const SpinWinScreen({super.key});
@@ -166,7 +167,7 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
                     watchedAd: false,
                   );
                   if (mounted) {
-                    Navigator.pop(context);
+                    AppRouter().goBack();
                     SnackbarHelper.showSuccess(
                       context,
                       '✅ Claimed $rewardAmount coins!',
@@ -198,7 +199,7 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
                           await userProvider.loadUserData(
                             userProvider.userData!.uid,
                           );
-                          Navigator.pop(context);
+                          AppRouter().goBack();
                           SnackbarHelper.showSuccess(
                             context,
                             '🎉 Claimed $doubledReward coins (doubled)!',
@@ -241,10 +242,7 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: const CustomAppBar(
-        title: 'Spin & Win',
-        showBackButton: true,
-      ),
+      appBar: const CustomAppBar(title: 'Spin & Win', showBackButton: true),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, _) {
           final spinsRemaining = userProvider.userData?.totalSpins ?? 0;

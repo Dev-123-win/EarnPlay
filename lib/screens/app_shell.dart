@@ -8,10 +8,10 @@ import 'home_screen.dart';
 import 'daily_streak_screen.dart';
 import 'watch_earn_screen.dart';
 import 'profile_screen.dart';
-import '../widgets/app_navigator.dart'; // Import AppNavigator
 
 /// Main app shell with persistent BottomNavigationBar
-/// This replaces the old navigation system and provides smooth transitions
+/// SINGLE navigation pattern: PageController for tabs (no nested navigators)
+/// All external navigation goes through AppRouter service
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -22,12 +22,6 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   late PageController _pageController;
   int _currentIndex = 0;
-
-  // GlobalKeys for nested navigators
-  final GlobalKey<NavigatorState> _homeTabNavigatorKey = GlobalKey<NavigatorState>();
-  final GlobalKey<NavigatorState> _dailyStreakTabNavigatorKey = GlobalKey<NavigatorState>();
-  final GlobalKey<NavigatorState> _watchEarnTabNavigatorKey = GlobalKey<NavigatorState>();
-  final GlobalKey<NavigatorState> _profileTabNavigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -72,23 +66,13 @@ class _AppShellState extends State<AppShell> {
             _currentIndex = index;
           });
         },
-        children: [
-          AppNavigator(
-            navigatorKey: _homeTabNavigatorKey,
-            child: HomeScreen(),
-          ),
-          AppNavigator(
-            navigatorKey: _dailyStreakTabNavigatorKey,
-            child: const DailyStreakScreen(),
-          ),
-          AppNavigator(
-            navigatorKey: _watchEarnTabNavigatorKey,
-            child: const WatchEarnScreen(),
-          ),
-          AppNavigator(
-            navigatorKey: _profileTabNavigatorKey,
-            child: const ProfileScreen(),
-          ),
+        physics:
+            const NeverScrollableScrollPhysics(), // Prevent swipe, use tabs
+        children: const [
+          HomeScreen(),
+          DailyStreakScreen(),
+          WatchEarnScreen(),
+          ProfileScreen(),
         ],
       ),
       bottomNavigationBar: Container(

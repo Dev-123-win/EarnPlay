@@ -6,8 +6,9 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/game_provider.dart';
 import '../../services/ad_service.dart';
+import '../../services/navigation_service.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/custom_app_bar.dart'; // Import CustomAppBar
+import '../../widgets/custom_app_bar.dart';
 
 class WhackMoleScreen extends StatefulWidget {
   const WhackMoleScreen({super.key});
@@ -130,7 +131,9 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
   void _showGameResult() {
     final baseCoins = (score / 2).toInt().clamp(5, 100);
     final doubledCoins = baseCoins * 2;
-    final colorScheme = Theme.of(context).colorScheme; // Define colorScheme here
+    final colorScheme = Theme.of(
+      context,
+    ).colorScheme; // Define colorScheme here
 
     showDialog(
       context: context,
@@ -166,11 +169,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.play_circle,
-                    color: colorScheme.primary,
-                    size: 20,
-                  ),
+                  Icon(Icons.play_circle, color: colorScheme.primary, size: 20),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -189,7 +188,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
+              AppRouter().goBack();
               _handleGameEnd(baseCoins);
             },
             child: Text('Claim $baseCoins'),
@@ -200,7 +199,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
                 bool rewardGiven = await _adService.showRewardedAd(
                   onUserEarnedReward: (RewardItem reward) async {
                     try {
-                      Navigator.pop(context);
+                      AppRouter().goBack();
                       await _handleGameEnd(doubledCoins);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -235,7 +234,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
                   },
                 );
                 if (!rewardGiven && mounted) {
-                  Navigator.pop(context);
+                  AppRouter().goBack();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: const Text('Ad not ready. Try again later.'),
@@ -256,9 +255,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
             },
             icon: const Icon(Icons.play_circle),
             label: Text('Watch Ad (2x = $doubledCoins)'),
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.primary,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: colorScheme.primary),
           ),
         ],
       ),
@@ -301,10 +298,7 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: const CustomAppBar(
-        title: 'Whack a Mole',
-        showBackButton: true,
-      ),
+      appBar: const CustomAppBar(title: 'Whack a Mole', showBackButton: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

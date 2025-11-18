@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../utils/animation_helper.dart';
+import '../providers/game_provider.dart';
+import '../models/game_models.dart';
 
 class GameHistoryScreen extends StatefulWidget {
   const GameHistoryScreen({super.key});
@@ -46,54 +49,22 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
     // Pagination logic would go here
   }
 
-  List<GameRecord> _getFilteredHistory() {
-    // Mock data - in production would come from Firestore
-    final mockData = [
-      GameRecord(
-        gameType: 'TicTacToe',
-        result: 'Won',
-        coinsEarned: 10,
-        playedAt: DateTime.now(),
-        duration: const Duration(minutes: 3),
-      ),
-      GameRecord(
-        gameType: 'WhackAMole',
-        result: 'Won',
-        coinsEarned: 8,
-        playedAt: DateTime.now().subtract(const Duration(hours: 1)),
-        duration: const Duration(minutes: 2),
-      ),
-      GameRecord(
-        gameType: 'TicTacToe',
-        result: 'Lost',
-        coinsEarned: 0,
-        playedAt: DateTime.now().subtract(const Duration(hours: 2)),
-        duration: const Duration(minutes: 4),
-      ),
-      GameRecord(
-        gameType: 'Spin',
-        result: 'Won',
-        coinsEarned: 15,
-        playedAt: DateTime.now().subtract(const Duration(hours: 3)),
-        duration: const Duration(seconds: 30),
-      ),
-      GameRecord(
-        gameType: 'WhackAMole',
-        result: 'Lost',
-        coinsEarned: 0,
-        playedAt: DateTime.now().subtract(const Duration(hours: 5)),
-        duration: const Duration(minutes: 1),
-      ),
-      GameRecord(
-        gameType: 'TicTacToe',
-        result: 'Draw',
-        coinsEarned: 5,
-        playedAt: DateTime.now().subtract(const Duration(days: 1)),
-        duration: const Duration(minutes: 3),
-      ),
-    ];
+  List<GameRecord> _getFilteredHistory(List<GameResult> gameResults) {
+    // Convert GameResult from provider to GameRecord for display
+    final records = gameResults.map((result) {
+      final resultStatus = result.isWon ? 'Won' : 'Lost';
 
-    return mockData.where((record) {
+      return GameRecord(
+        gameType: _formatGameName(result.gameName),
+        result: resultStatus,
+        coinsEarned: result.coinsEarned,
+        playedAt: result.playedAt,
+        duration: Duration(seconds: result.duration),
+      );
+    }).toList();
+
+    // Apply filters
+    return records.where((record) {
       final typeMatch =
           _selectedGameType == 'All' || record.gameType == _selectedGameType;
       final resultMatch =
@@ -102,11 +73,26 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
     }).toList();
   }
 
+  /// Convert game name to display format
+  String _formatGameName(String gameName) {
+    switch (gameName.toLowerCase()) {
+      case 'tictactoe':
+        return 'TicTacToe';
+      case 'whackmole':
+        return 'WhackAMole';
+      case 'spin':
+        return 'Spin';
+      case 'ads':
+        return 'Ads';
+      default:
+        return gameName;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final filteredHistory = _getFilteredHistory();
 
     return Scaffold(
       appBar: AppBar(
@@ -116,148 +102,156 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
         elevation: 2,
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        controller: _scrollController,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Game Type Filter
-            Text(
-              'Filter by Game',
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _gameTypes.map((type) {
-                  final isSelected = _selectedGameType == type;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(type),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        setState(() => _selectedGameType = type);
-                      },
-                      backgroundColor: colorScheme.surfaceContainer,
-                      selectedColor: colorScheme.primary,
-                      labelStyle: TextStyle(
-                        color: isSelected
-                            ? colorScheme.onPrimary
-                            : colorScheme.onSurface,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 16),
+      body: Consumer<GameProvider>(
+        builder: (context, gameProvider, _) {
+          final filteredHistory = _getFilteredHistory(
+            gameProvider.localGameHistory,
+          );
 
-            // Result Filter
-            Text(
-              'Filter by Result',
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _resultTypes.map((type) {
-                  final isSelected = _selectedResult == type;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(type),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        setState(() => _selectedResult = type);
-                      },
-                      backgroundColor: colorScheme.surfaceContainer,
-                      selectedColor: colorScheme.secondary,
-                      labelStyle: TextStyle(
-                        color: isSelected
-                            ? colorScheme.onSecondary
-                            : colorScheme.onSurface,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Stats Cards
-            Row(
+          return SingleChildScrollView(
+            controller: _scrollController,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _buildStatCard(
-                    label: 'Total Games',
-                    value: '${filteredHistory.length}',
-                    icon: Icons.sports_esports,
-                    color: colorScheme.primary,
-                    colorScheme: colorScheme,
-                    textTheme: textTheme,
+                // Game Type Filter
+                Text(
+                  'Filter by Game',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    label: 'Total Coins',
-                    value:
-                        '${filteredHistory.fold<int>(0, (sum, record) => sum + record.coinsEarned)}',
-                    icon: Icons.monetization_on,
-                    color: colorScheme.tertiary,
-                    colorScheme: colorScheme,
-                    textTheme: textTheme,
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _gameTypes.map((type) {
+                      final isSelected = _selectedGameType == type;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(type),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() => _selectedGameType = type);
+                          },
+                          backgroundColor: colorScheme.surfaceContainer,
+                          selectedColor: colorScheme.primary,
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? colorScheme.onPrimary
+                                : colorScheme.onSurface,
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
+                const SizedBox(height: 16),
+
+                // Result Filter
+                Text(
+                  'Filter by Result',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _resultTypes.map((type) {
+                      final isSelected = _selectedResult == type;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(type),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() => _selectedResult = type);
+                          },
+                          backgroundColor: colorScheme.surfaceContainer,
+                          selectedColor: colorScheme.secondary,
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? colorScheme.onSecondary
+                                : colorScheme.onSurface,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Stats Cards
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        label: 'Total Games',
+                        value: '${filteredHistory.length}',
+                        icon: Icons.sports_esports,
+                        color: colorScheme.primary,
+                        colorScheme: colorScheme,
+                        textTheme: textTheme,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        label: 'Total Coins',
+                        value:
+                            '${filteredHistory.fold<int>(0, (sum, record) => sum + record.coinsEarned)}',
+                        icon: Icons.monetization_on,
+                        color: colorScheme.tertiary,
+                        colorScheme: colorScheme,
+                        textTheme: textTheme,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // History List
+                Text(
+                  'Recent Games',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (filteredHistory.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.history,
+                            size: 48,
+                            color: colorScheme.primary.withValues(alpha: 128),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No games found',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ...List.generate(filteredHistory.length, (index) {
+                    final record = filteredHistory[index];
+                    return _buildHistoryCard(record, colorScheme, textTheme);
+                  }),
               ],
             ),
-            const SizedBox(height: 24),
-
-            // History List
-            Text(
-              'Recent Games',
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (filteredHistory.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.history,
-                        size: 48,
-                        color: colorScheme.primary.withValues(alpha: 128),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No games found',
-                        style: textTheme.bodySmall?.copyWith(
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              ...List.generate(filteredHistory.length, (index) {
-                final record = filteredHistory[index];
-                return _buildHistoryCard(record, colorScheme, textTheme);
-              }),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -285,7 +279,7 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                   Text(
                     label,
                     style: textTheme.labelSmall?.copyWith(
-                      color: Colors.grey.shade600,
+                      color: color,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -366,7 +360,7 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: resultColor.withValues(alpha: 51),
+                            color: resultColor.withValues(alpha: 25),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
@@ -426,7 +420,7 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: colorScheme.tertiaryContainer,
+                    color: colorScheme.tertiary.withValues(alpha: 25),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

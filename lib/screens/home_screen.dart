@@ -6,18 +6,10 @@ import '../providers/user_provider.dart';
 import '../providers/game_provider.dart';
 import '../services/firebase_service.dart';
 import '../services/ad_service.dart';
+import '../services/navigation_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/currency_helper.dart';
-import '../widgets/custom_app_bar.dart'; // Import CustomAppBar
-import 'profile_screen.dart'; // Added import
-import 'withdrawal_screen.dart'; // Added import
-import 'daily_streak_screen.dart'; // Added import
-import 'watch_earn_screen.dart'; // Added import
-import 'spin_win_screen.dart'; // Added import
-import 'games/tictactoe_screen.dart'; // Added import
-import 'games/whack_mole_screen.dart'; // Added import
-import 'referral_screen.dart'; // Added import
-import 'game_history_screen.dart'; // Added import
+import '../widgets/custom_app_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -112,97 +104,167 @@ class _HomeScreenState extends State<HomeScreen> {
                   actions: [
                     IconButton(
                       icon: const Icon(Iconsax.user),
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                      ),
+                      onPressed: () {
+                        // Note: Profile is accessible via bottom nav (Profile tab)
+                        // No need to navigate here
+                      },
                     ),
                     IconButton(
                       icon: const Icon(Iconsax.setting_2),
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => const ProfileScreen()), // Assuming settings is part of profile
-                      ),
+                      onPressed: () {
+                        // Note: Settings are in Profile tab (accessible via bottom nav)
+                        // No need to navigate here
+                      },
                     ),
                   ],
                 ),
               ),
 
-              // ========== BALANCE CARD (SIMPLIFIED) ==========
+              // ========== BALANCE CARD (PREMIUM REDESIGN) ==========
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          colorScheme.primary,
-                          colorScheme.primary.withAlpha(200),
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: colorScheme.primary.withAlpha(80),
-                          blurRadius: 16,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Total Balance',
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(
-                                  color: colorScheme.onPrimary.withAlpha(200),
-                                ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              CurrencyDisplay(
-                                coins: userProvider.userData!.coins,
-                                coinSize: 32,
-                                spacing: 10,
-                                textStyle: Theme.of(context)
-                                    .textTheme
-                                    .displayMedium
-                                    ?.copyWith(
-                                      color: colorScheme.onPrimary,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                showRealCurrency: true, // Show real currency on home screen
-                              ),
-                              FilledButton(
-                                onPressed: () => Navigator.of(context).push(
-                                  MaterialPageRoute(builder: (context) => const WithdrawalScreen()),
-                                ),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: colorScheme.onPrimary,
-                                ),
-                                child: Text(
-                                  'Withdraw',
-                                  style: TextStyle(
-                                    color: colorScheme.primary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Stack(
+                    children: [
+                      // Background gradient container
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              colorScheme.primary,
+                              colorScheme.primary.withAlpha(180),
                             ],
                           ),
-                        ],
+                          boxShadow: [
+                            BoxShadow(
+                              color: colorScheme.primary.withAlpha(100),
+                              blurRadius: 24,
+                              offset: const Offset(0, 12),
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      // Content
+                      Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            // Header row: Title + Badge
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Your Balance',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelMedium
+                                          ?.copyWith(
+                                            color: colorScheme.onPrimary
+                                                .withAlpha(180),
+                                            letterSpacing: 0.5,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Ready to Withdraw',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: colorScheme.onPrimary
+                                                .withAlpha(120),
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.onPrimary.withAlpha(30),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: colorScheme.onPrimary.withAlpha(
+                                        60,
+                                      ),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '💰 Active',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: colorScheme.onPrimary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            // Main balance display
+                            CurrencyDisplay(
+                              coins: userProvider.userData!.coins,
+                              coinSize: 36,
+                              spacing: 12,
+                              textStyle: Theme.of(context)
+                                  .textTheme
+                                  .displayLarge
+                                  ?.copyWith(
+                                    color: colorScheme.onPrimary,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -1,
+                                  ),
+                              showRealCurrency: true,
+                            ),
+                            const SizedBox(height: 20),
+                            // Action buttons row
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: () async =>
+                                        await AppRouter().goToWithdrawal(),
+                                    icon: const Icon(Iconsax.arrow_right_1),
+                                    label: const Text('Withdraw'),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: colorScheme.onPrimary,
+                                      foregroundColor: colorScheme.primary,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)), // Added spacing
-
+              const SliverToBoxAdapter(
+                child: SizedBox(height: 24),
+              ), // Added spacing
               // ========== GAMES SECTION ==========
               SliverToBoxAdapter(
                 child: Padding(
@@ -226,12 +288,16 @@ class _HomeScreenState extends State<HomeScreen> {
                             colorScheme,
                             title: 'Daily Streak',
                             subtitle: 'Check in daily',
-                            rewardWidget: _buildRewardChip(context, 'Varies', colorScheme.tertiary),
+                            rewardWidget: _buildRewardChip(
+                              context,
+                              'Varies',
+                              colorScheme.tertiary,
+                            ),
                             icon: Iconsax.activity,
                             color: colorScheme.tertiary,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => const DailyStreakScreen()),
-                            ),
+                            onTap: () {
+                              // Daily Streak is accessible via bottom nav (Streak tab)
+                            },
                             boxShadow: BoxShadow(
                               color: colorScheme.tertiary.withOpacity(0.1),
                               blurRadius: 8,
@@ -244,12 +310,16 @@ class _HomeScreenState extends State<HomeScreen> {
                             colorScheme,
                             title: 'Watch Ads',
                             subtitle: 'Up to 10/day',
-                            rewardWidget: _buildRewardChip(context, '50 coins/day', colorScheme.primary),
+                            rewardWidget: _buildRewardChip(
+                              context,
+                              '50 coins/day',
+                              colorScheme.primary,
+                            ),
                             icon: Iconsax.play_circle,
                             color: colorScheme.primary,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => const WatchEarnScreen()),
-                            ),
+                            onTap: () {
+                              // Watch Ads is accessible via bottom nav (Earn tab)
+                            },
                             boxShadow: BoxShadow(
                               color: colorScheme.primary.withOpacity(0.1),
                               blurRadius: 8,
@@ -262,12 +332,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             colorScheme,
                             title: 'Spin & Win',
                             subtitle: '3 free spins/day',
-                            rewardWidget: _buildRewardChip(context, '10-50 coins', AppTheme.streakColor),
+                            rewardWidget: _buildRewardChip(
+                              context,
+                              '10-50 coins',
+                              AppTheme.streakColor,
+                            ),
                             icon: Iconsax.star,
                             color: AppTheme.streakColor,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => const SpinWinScreen()),
-                            ),
+                            onTap: () async => await AppRouter().goToSpinWin(),
                             boxShadow: BoxShadow(
                               color: AppTheme.streakColor.withOpacity(0.1),
                               blurRadius: 8,
@@ -288,12 +360,15 @@ class _HomeScreenState extends State<HomeScreen> {
                             colorScheme,
                             title: 'Tic Tac Toe',
                             subtitle: 'Play vs AI',
-                            rewardWidget: _buildRewardChip(context, '25 coins/win', colorScheme.secondary),
+                            rewardWidget: _buildRewardChip(
+                              context,
+                              '25 coins/win',
+                              colorScheme.secondary,
+                            ),
                             icon: Iconsax.game,
                             color: colorScheme.secondary,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => const TicTacToeScreen()),
-                            ),
+                            onTap: () async =>
+                                await AppRouter().goToTicTacToe(),
                             boxShadow: BoxShadow(
                               color: colorScheme.secondary.withOpacity(0.1),
                               blurRadius: 8,
@@ -306,14 +381,19 @@ class _HomeScreenState extends State<HomeScreen> {
                             colorScheme,
                             title: 'Whack-A-Mole',
                             subtitle: 'Fast reflexes',
-                            rewardWidget: _buildRewardChip(context, '50 coins/win', colorScheme.primaryContainer),
+                            rewardWidget: _buildRewardChip(
+                              context,
+                              '50 coins/win',
+                              colorScheme.primaryContainer,
+                            ),
                             icon: Iconsax.cpu,
                             color: colorScheme.primaryContainer,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => const WhackMoleScreen()),
-                            ),
+                            onTap: () async =>
+                                await AppRouter().goToWhackMole(),
                             boxShadow: BoxShadow(
-                              color: colorScheme.primaryContainer.withOpacity(0.1),
+                              color: colorScheme.primaryContainer.withOpacity(
+                                0.1,
+                              ),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
@@ -324,8 +404,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)), // Added spacing
-
+              const SliverToBoxAdapter(
+                child: SizedBox(height: 24),
+              ), // Added spacing
               // ========== STATS SECTION (FIXED 4-COLUMN GRID) ==========
               SliverToBoxAdapter(
                 child: Padding(
@@ -358,7 +439,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             _buildStatBox(
                               context,
                               icon: Iconsax.play,
-                              value: '${userProvider.userData!.totalAdsWatched}',
+                              value:
+                                  '${userProvider.userData!.totalAdsWatched}',
                               label: 'Ads Watched',
                               color: colorScheme.secondary,
                             ),
@@ -376,18 +458,19 @@ class _HomeScreenState extends State<HomeScreen> {
                               icon: Iconsax.crown,
                               value:
                                   '${userProvider.userData!.dailyStreak.currentStreak}',
-                            label: 'Daily Streak',
-                            color: AppTheme.streakColor,
-                          ),
-                        ],
-                      ),
+                              label: 'Daily Streak',
+                              color: AppTheme.streakColor,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)), // Added spacing
-
+              const SliverToBoxAdapter(
+                child: SizedBox(height: 24),
+              ), // Added spacing
               // ========== REFERRAL & ACTION CARDS ==========
               SliverToBoxAdapter(
                 child: Padding(
@@ -407,9 +490,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               title: 'Referral',
                               subtitle: 'Earn 500/friend',
                               backgroundColor: colorScheme.secondaryContainer,
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute(builder: (context) => const ReferralScreen()),
-                              ),
+                              onTap: () async =>
+                                  await AppRouter().goToReferral(),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -421,9 +503,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               title: 'History',
                               subtitle: 'View stats',
                               backgroundColor: colorScheme.tertiaryContainer,
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute(builder: (context) => const GameHistoryScreen()),
-                              ),
+                              onTap: () async =>
+                                  await AppRouter().goToGameHistory(),
                             ),
                           ),
                         ],
@@ -432,16 +513,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)), // Added spacing
-
+              const SliverToBoxAdapter(
+                child: SizedBox(height: 24),
+              ), // Added spacing
               // ========== BANNER AD ==========
               SliverToBoxAdapter(
                 child: _bannerAd != null && _adService.isBannerAdReady
                     ? Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 20,
+                        ),
                         child: Container(
                           width: double.infinity,
-                          height: 60, // Slightly increased height for better visibility
+                          height:
+                              60, // Slightly increased height for better visibility
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainer,
                             borderRadius: BorderRadius.circular(12),
@@ -499,9 +585,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
               label,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: color.withAlpha(180),
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: color.withAlpha(180)),
             ),
           ],
         ),
@@ -638,10 +724,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildRewardChip(BuildContext context, String reward, Color color) {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
         color: color,

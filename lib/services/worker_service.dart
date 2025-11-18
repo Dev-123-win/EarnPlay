@@ -14,12 +14,11 @@ class WorkerService {
   WorkerService._internal();
 
   /// Cloudflare Worker base URL
-  /// TODO: Replace with your actual deployed worker URL
-  /// Example: 'https://earnplay-api.your-subdomain.workers.dev'
+  /// ✅ Production: Connected to earnplay12345.workers.dev
   static const String workerBaseUrl =
-      'http://localhost:8787'; // Local development
+      'https://earnplay12345.workers.dev'; // Production
   // static const String workerBaseUrl =
-  //     'https://earnplay-api.your-subdomain.workers.dev'; // Production
+  //     'http://localhost:8787'; // Local development (commented out)
 
   /// Request timeout duration
   static const Duration requestTimeout = Duration(seconds: 30);

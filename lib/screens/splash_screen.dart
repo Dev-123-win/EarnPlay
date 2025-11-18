@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/navigation_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -21,15 +22,12 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     final user = FirebaseAuth.instance.currentUser;
+    final router = AppRouter();
 
     if (user != null) {
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/home');
-      }
+      await router.goToHome();
     } else {
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
-      }
+      await router.goToLogin();
     }
   }
 
