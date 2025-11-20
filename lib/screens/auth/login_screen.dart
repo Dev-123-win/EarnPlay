@@ -337,8 +337,29 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextButton(
                       onPressed: _isLoading
                           ? null
-                          : () async {
-                              await AppRouter().goToRegister();
+                          : () {
+                              // Use AppRouter but avoid awaiting to prevent UI hangs.
+                              try {
+                                AppRouter().goToRegister();
+                                // Fallback: if router key not available, use Navigator directly
+                                if (AppRouter().navigatorKey.currentState ==
+                                    null) {
+                                  Navigator.of(context).pushNamed('/register');
+                                }
+                              } catch (e) {
+                                // Final fallback and user-friendly message
+                                try {
+                                  Navigator.of(context).pushNamed('/register');
+                                } catch (_) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Unable to open Register screen',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
                             },
                       child: Text(
                         'Create Account',

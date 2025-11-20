@@ -6,6 +6,8 @@ import '../providers/user_provider.dart';
 import '../utils/dialog_helper.dart';
 import '../utils/currency_helper.dart';
 
+// ignore_for_file: deprecated_member_use
+
 class WithdrawalScreen extends StatefulWidget {
   const WithdrawalScreen({super.key});
 
@@ -73,7 +75,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
           status: 'Pending',
           amount: '$amount',
           message:
-              'Your withdrawal request has been submitted.\nYou will receive the amount within 24-48 hours.',
+              'Your withdrawal request has been submitted. Balance debited instantly. Payout is processed within 24-72 hours. You can track the status in Withdrawal History. Contact support if not received.',
           onClose: () {
             _amountController.clear();
             _upiController.clear();
@@ -491,7 +493,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '24-48 hours after approval',
+                                  'Balance debited instantly. Payout processed within 24-72 hours.',
                                   style: Theme.of(context).textTheme.titleSmall
                                       ?.copyWith(
                                         color: colorScheme.onErrorContainer,
@@ -504,6 +506,20 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                         ],
                       ),
                     ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // View withdrawal history
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      final uid = userProvider.userData?.uid;
+                      if (uid == null) return;
+                      Navigator.of(context)
+                          .pushNamed('/withdrawal-history', arguments: uid);
+                    },
+                    child: const Text('View Withdrawal History'),
                   ),
                 ),
                 const SizedBox(height: 24),

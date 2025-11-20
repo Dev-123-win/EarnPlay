@@ -4,6 +4,7 @@ import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
 import '../providers/game_provider.dart';
 import '../services/firebase_service.dart';
+import '../services/navigation_service.dart';
 import 'home_screen.dart';
 import 'daily_streak_screen.dart';
 import 'watch_earn_screen.dart';
@@ -27,6 +28,12 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
+
+    // CRITICAL: Register tab navigation callback for cross-component navigation
+    setTabNavigationCallback((tabIndex) {
+      _onNavTap(tabIndex);
+    });
+
     _loadUserData();
   }
 

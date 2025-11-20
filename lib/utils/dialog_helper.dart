@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import 'animation_helper.dart';
 
@@ -231,8 +232,9 @@ class DialogSystem {
     required String status,
     required String amount,
     String? message,
+    String? withdrawalId,
     VoidCallback? onClose,
-  }) {
+  }) async {
     final isApproved = status.toLowerCase() == 'approved';
     final isPending = status.toLowerCase() == 'pending';
 
@@ -260,6 +262,26 @@ class DialogSystem {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('Amount: $amount'),
+              if (withdrawalId != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: Text('Ref: $withdrawalId')),
+                    IconButton(
+                      tooltip: 'Copy transaction id',
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: withdrawalId));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Transaction id copied'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.copy),
+                    ),
+                  ],
+                ),
+              ],
               if (message != null) ...[
                 const SizedBox(height: 12),
                 Text(

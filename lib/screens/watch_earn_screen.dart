@@ -4,6 +4,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:iconsax/iconsax.dart';
 import '../providers/user_provider.dart';
 import '../services/ad_service.dart';
+import '../services/worker_service.dart';
 import '../utils/currency_helper.dart';
 import '../widgets/custom_app_bar.dart'; // Import CustomAppBar
 
@@ -58,71 +59,69 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
     }
 
     try {
-      bool rewardGiven = await _adService.showRewardedAd(
-        onUserEarnedReward: (RewardItem reward) async {
-          try {
-            // ✅ Phase 1: Pass adUnitId to worker
-            await userProvider.incrementWatchedAds(
-              coinsPerAd,
-              adUnitId: AdService.rewardedAdId, // Pass the ad unit ID
-            );
-
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        color: colorScheme.onTertiaryContainer,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Earned $coinsPerAd coins!',
-                        style: TextStyle(
-                          color: colorScheme.onTertiaryContainer,
-                        ),
-                      ),
-                    ],
-                  ),
-                  backgroundColor: colorScheme.tertiaryContainer,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Error: $e',
-                    style: TextStyle(color: colorScheme.onErrorContainer),
-                  ),
-                  backgroundColor: colorScheme.errorContainer,
-                ),
-              );
-            }
-          }
-        },
+      // Show a loading dialog while ad loads and verification proceeds
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
-      if (!rewardGiven && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Ad not ready. Try again in a moment.',
-              style: TextStyle(color: colorScheme.onSecondaryContainer),
+      // Use WorkerService.verifyAdReward which handles challenge + verify
+      final result = await WorkerService().verifyAdReward(
+        adUnitId: AdService.rewardedAdId,
+      );
+
+      // Dismiss loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      if (result['success'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: colorScheme.onTertiaryContainer,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Earned $coinsPerAd coins!',
+                    style: TextStyle(color: colorScheme.onTertiaryContainer),
+                  ),
+                ],
+              ),
+              backgroundColor: colorScheme.tertiaryContainer,
+              duration: const Duration(seconds: 2),
             ),
-            backgroundColor: colorScheme.secondaryContainer,
-          ),
-        );
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to verify ad reward. Please try again later.',
+                style: TextStyle(color: colorScheme.onErrorContainer),
+              ),
+              backgroundColor: colorScheme.errorContainer,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
+        // Dismiss loading if still showing
+        try {
+          Navigator.of(context).pop();
+        } catch (_) {}
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Error: $e',
+              e.toString().contains('Daily ad limit')
+                  ? 'Daily ad limit reached. Come back later.'
+                  : 'Error showing ad: ${e.toString()}',
               style: TextStyle(color: colorScheme.onErrorContainer),
             ),
             backgroundColor: colorScheme.errorContainer,
@@ -191,6 +190,53 @@ class _WatchEarnScreenState extends State<WatchEarnScreen> {
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
+                                  // Countdown to midnight for ad reset
+                                  SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      child: StreamBuilder<DateTime>(
+                                        stream: Stream.periodic(
+                                          const Duration(seconds: 1),
+                                          (_) {
+                                            final now = DateTime.now();
+                                            final nextMidnight = DateTime(
+                                              now.year,
+                                              now.month,
+                                              now.day,
+                                            ).add(const Duration(days: 1));
+                                            return nextMidnight;
+                                          },
+                                        ),
+                                        builder: (context, snap) {
+                                          final target =
+                                              snap.data ?? DateTime.now();
+                                          final remaining = target.difference(
+                                            DateTime.now(),
+                                          );
+                                          final twoDigits = (int n) =>
+                                              n.toString().padLeft(2, '0');
+                                          final hours = twoDigits(
+                                            remaining.inHours.remainder(24),
+                                          );
+                                          final minutes = twoDigits(
+                                            remaining.inMinutes.remainder(60),
+                                          );
+                                          final seconds = twoDigits(
+                                            remaining.inSeconds.remainder(60),
+                                          );
+                                          return Text(
+                                            'Ad limit resets in $hours:$minutes:$seconds',
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
                                   Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,

@@ -1,14 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import '../models/user_data_model.dart';
 import '../services/local_storage_service.dart';
 import '../services/firebase_service.dart';
 import '../services/worker_service.dart';
+import '../services/event_queue_service.dart';
+import 'package:uuid/uuid.dart';
 
 class UserProvider extends ChangeNotifier {
+  // ========== PRODUCTION LIMITS (BALANCED FOR SUSTAINABILITY) ==========
+  // Align client-side limits and rewards with server constants
+  static const int maxAdsPerDay = 10; // Server authoritative limit
+  static const int maxTicTacToeWinsPerDay = 20; // Soft client-side throttle
+  static const int maxWhackMoleWinsPerDay = 20; // Soft client-side throttle
+  static const int spinsPerDay = 3; // Server: 3 spins/day
+
+  // ========== REWARD AMOUNTS (MATCHES SERVER `REWARDS`) ==========
+  static const int rewardAdWatch = 5; // Server REWARDS.AD_WATCH
+  static const int rewardTicTacToeWin = 10; // Server GAME_WIN
+  static const int rewardWhackMoleWin = 10; // Map to server GAME_WIN
+  static const int rewardSpinAverage = 25; // Server SPIN_WIN
+  static const int rewardStreakBase = 15; // Server DAILY_STREAK_BONUS
+
   UserData? _userData;
   bool _isLoading = false;
   String? _error;
+
+  // Event queue management
+  late EventQueueService _eventQueue;
+  Timer? _flushTimer;
 
   UserData? get userData => _userData;
   bool get isLoading => _isLoading;
@@ -20,6 +41,11 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Initialize event queue on first load
+      _eventQueue = EventQueueService();
+      await _eventQueue.initialize();
+      _startFlushTimer();
+
       final firebaseService = FirebaseService();
       final data = await firebaseService.getUserData(uid);
 
@@ -63,27 +89,43 @@ class UserProvider extends ChangeNotifier {
 
     try {
       final uid = _userData!.uid;
-      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
 
-      // CRITICAL: Use FieldValue.increment() NOT direct set
-      // This ensures atomicity even with concurrent writes
-      await userRef.update({
-        'coins': FieldValue.increment(amount),
-        'lastUpdated': FieldValue.serverTimestamp(),
-      });
-
-      // Create audit trail for fraud detection
-      await userRef.collection('actions').add({
-        'type': 'MANUAL_BONUS',
-        'amount': amount,
-        'reason': reason,
-        'timestamp': FieldValue.serverTimestamp(),
-        'userId': uid,
-      });
-
+      // Optimistic update for UI responsiveness
       _userData!.coins += amount;
       await LocalStorageService.saveUserData(_userData!);
       notifyListeners();
+
+      // Prepare single-event batch to Worker for authoritative write
+      final eventId = const Uuid().v4();
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final event = {
+        'id': eventId,
+        'type': 'MANUAL_BONUS',
+        'coins': amount,
+        'metadata': {'reason': reason},
+        'timestamp': now,
+        'idempotencyKey': '${uid}_${eventId}_$now',
+      };
+
+      final result = await WorkerService().batchEvents(
+        userId: uid,
+        events: [event],
+      );
+
+      if (result['success'] == true) {
+        final data = result['data'] as Map<String, dynamic>;
+        if (data['newBalance'] != null) {
+          _userData!.coins = data['newBalance'];
+          await LocalStorageService.saveUserData(_userData!);
+          notifyListeners();
+        }
+      } else {
+        // Revert optimistic update on failure
+        _userData!.coins -= amount;
+        await LocalStorageService.saveUserData(_userData!);
+        notifyListeners();
+        throw Exception('Failed to update coins via worker');
+      }
     } catch (e) {
       _error = 'Failed to update coins: $e';
       notifyListeners();
@@ -462,6 +504,138 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
+  /// ✅ PHASE 1.0: Optimistic coin update + queue event for batching
+  /// Called when user plays game
+  Future<void> recordGameWin({
+    required int coinsReward,
+    required String gameName,
+    required int duration,
+  }) async {
+    if (_userData == null) return;
+
+    try {
+      // Step 1: Optimistic update (INSTANT UI feedback)
+      _userData!.coins += coinsReward;
+      _userData!.totalGamesWon++;
+      notifyListeners();
+      await LocalStorageService.saveUserData(_userData!);
+
+      // Step 2: Queue event for batch sync
+      await _eventQueue.addEvent(
+        userId: _userData!.uid,
+        type: 'GAME_WON',
+        coins: coinsReward,
+        metadata: {'gameName': gameName, 'duration': duration},
+      );
+
+      // Step 3: Check if should flush by size
+      if (_eventQueue.shouldFlushBySize()) {
+        unawaited(flushEventQueue());
+      }
+    } catch (e) {
+      _error = 'Failed to record game win: $e';
+      notifyListeners();
+    }
+  }
+
+  /// ✅ PHASE 1.0: Optimistic coin update + queue event for batching
+  /// Called when user completes spin
+  Future<void> recordSpinClaimed({required int coinsReward}) async {
+    if (_userData == null) return;
+
+    try {
+      // Step 1: Optimistic update (INSTANT UI feedback)
+      _userData!.coins += coinsReward;
+      _userData!.totalSpins--;
+      notifyListeners();
+      await LocalStorageService.saveUserData(_userData!);
+
+      // Step 2: Queue event for batch sync
+      await _eventQueue.addEvent(
+        userId: _userData!.uid,
+        type: 'SPIN_CLAIMED',
+        coins: coinsReward,
+        metadata: {'timestamp': DateTime.now().millisecondsSinceEpoch},
+      );
+    } catch (e) {
+      _error = 'Failed to record spin claim: $e';
+      notifyListeners();
+    }
+  }
+
+  /// ✅ PHASE 1.0: Optimistic coin update + queue event for batching
+  /// Called when user claims daily streak
+  Future<void> recordStreakClaimed({required int coinsReward}) async {
+    if (_userData == null) return;
+
+    try {
+      // Step 1: Optimistic update (INSTANT UI feedback)
+      _userData!.coins += coinsReward;
+      _userData!.dailyStreak.currentStreak++;
+      notifyListeners();
+      await LocalStorageService.saveUserData(_userData!);
+
+      // Step 2: Queue event for batch sync
+      await _eventQueue.addEvent(
+        userId: _userData!.uid,
+        type: 'STREAK_CLAIMED',
+        coins: coinsReward,
+        metadata: {'streak': _userData!.dailyStreak.currentStreak},
+      );
+    } catch (e) {
+      _error = 'Failed to record streak claim: $e';
+      notifyListeners();
+    }
+  }
+
+  /// Start periodic flush timer (60 seconds)
+  void _startFlushTimer() {
+    _flushTimer?.cancel();
+    _flushTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => flushEventQueue(),
+    );
+  }
+
+  /// Flush pending events to Worker /batch-events endpoint
+  Future<void> flushEventQueue() async {
+    try {
+      final pendingEvents = _eventQueue.getPendingEvents();
+      if (pendingEvents.isEmpty) return;
+
+      // Mark as INFLIGHT to prevent duplicate sends
+      final eventIds = pendingEvents.map((e) => e['id'] as String).toList();
+      await _eventQueue.markInflight(eventIds);
+
+      final uid = _userData?.uid;
+      if (uid == null) return;
+
+      // Call Worker /batch-events endpoint
+      final result = await WorkerService().batchEvents(
+        userId: uid,
+        events: pendingEvents,
+      );
+
+      if (result['success'] == true) {
+        // Confirmed by server: Remove from queue
+        await _eventQueue.markSynced(eventIds);
+
+        // Update balance if server differs
+        if (result['newBalance'] != null) {
+          _userData!.coins = result['newBalance'];
+          notifyListeners();
+        }
+      } else {
+        // Mark as PENDING for retry
+        await _eventQueue.markPending(eventIds);
+        throw Exception('Worker returned success=false');
+      }
+    } catch (e) {
+      // Silently fail (will retry on next timer)
+      debugPrint('[UserProvider] Flush failed: $e');
+    }
+  }
+
   void clearUserData() {
     _userData = null;
     notifyListeners();
@@ -690,6 +864,14 @@ class UserProvider extends ChangeNotifier {
       notifyListeners();
       rethrow;
     }
+  }
+
+  /// Cleanup on provider disposal
+  @override
+  void dispose() {
+    _flushTimer?.cancel();
+    _eventQueue.dispose();
+    super.dispose();
   }
 }
 

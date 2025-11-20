@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_fortune_wheel/flutter_fortune_wheel.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+import '../services/worker_service.dart';
+import 'package:uuid/uuid.dart';
 import '../providers/user_provider.dart';
 import '../utils/dialog_helper.dart';
 import '../services/ad_service.dart';
@@ -68,8 +69,53 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
 
     setState(() => _isSpinning = true);
 
-    _lastReward = _random.nextInt(rewards.length);
-    _selectedItem.add(_lastReward!);
+    // Ask server to perform spin (server-controlled RNG)
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final result = await WorkerService().verifySpin();
+
+      if (mounted) Navigator.of(context).pop();
+
+      if (result['success'] == true) {
+        final data = result['data'] as Map<String, dynamic>;
+        int? serverIndex;
+        if (data.containsKey('index')) {
+          serverIndex = (data['index'] as num).toInt();
+        }
+
+        // Fallback to server reward mapping if index not provided
+        if (serverIndex == null && data.containsKey('reward')) {
+          final reward = (data['reward'] as num).toInt();
+          serverIndex = rewards.indexOf(reward);
+        }
+
+        // If server didn't return an index/reward, fallback to client RNG
+        serverIndex ??= _random.nextInt(rewards.length);
+
+        _lastReward = serverIndex;
+        _selectedItem.add(_lastReward!);
+      } else {
+        // Server failed - fallback to client RNG but inform user
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Spin failed, try again')),
+          );
+        }
+        setState(() => _isSpinning = false);
+      }
+    } catch (e) {
+      try {
+        if (mounted) Navigator.of(context).pop();
+      } catch (_) {}
+      // Fallback to local RNG
+      _lastReward = _random.nextInt(rewards.length);
+      _selectedItem.add(_lastReward!);
+    }
   }
 
   Future<void> _showRewardDialogWithAd() async {
@@ -86,8 +132,8 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false, // Prevent back button dismissal
+      builder: (context) => PopScope(
+        canPop: false,
         child: AlertDialog(
           title: Row(
             children: [
@@ -161,68 +207,75 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
           actions: [
             TextButton(
               onPressed: () async {
+                // Base reward already credited by server spin; refresh local data
                 try {
-                  await userProvider.claimSpinReward(
-                    rewardAmount,
-                    watchedAd: false,
-                  );
+                  final uid = userProvider.userData?.uid;
+                  if (uid != null) {
+                    await userProvider.loadUserData(uid);
+                  }
                   if (mounted) {
                     AppRouter().goBack();
-                    SnackbarHelper.showSuccess(
-                      context,
-                      '✅ Claimed $rewardAmount coins!',
-                    );
+                    SnackbarHelper.showSuccess(context, '✅ Reward credited!');
                   }
                 } catch (e) {
-                  if (mounted) {
-                    SnackbarHelper.showError(context, 'Error: $e');
-                  }
+                  if (mounted) SnackbarHelper.showError(context, 'Error: $e');
                 }
               },
-              child: Text(
-                'Claim',
-                style: TextStyle(color: colorScheme.primary),
-              ),
+              child: Text('OK', style: TextStyle(color: colorScheme.primary)),
             ),
             FilledButton.icon(
               onPressed: () async {
+                // Double reward by watching an ad — send SPIN_DOUBLE event to worker
                 try {
-                  bool rewardGiven = await _adService.showRewardedAd(
-                    onUserEarnedReward: (RewardItem reward) async {
-                      try {
-                        final doubledReward = rewardAmount * 2;
-                        await userProvider.claimSpinReward(
-                          doubledReward,
-                          watchedAd: true,
-                        );
-                        if (mounted) {
-                          await userProvider.loadUserData(
-                            userProvider.userData!.uid,
-                          );
-                          AppRouter().goBack();
-                          SnackbarHelper.showSuccess(
-                            context,
-                            '🎉 Claimed $doubledReward coins (doubled)!',
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          SnackbarHelper.showError(context, 'Error: $e');
-                        }
-                      }
-                    },
+                  final uid = userProvider.userData?.uid;
+                  if (uid == null) throw Exception('User not loaded');
+
+                  // Prepare event to award extra coins equal to base reward
+                  final eventId = const Uuid().v4();
+                  final event = {
+                    'id': eventId,
+                    'type': 'SPIN_DOUBLE',
+                    'coins': rewardAmount,
+                    'metadata': {'spinIndex': _lastReward},
+                    'timestamp': DateTime.now().millisecondsSinceEpoch,
+                    'idempotencyKey': '${uid}_$eventId',
+                  };
+
+                  // Show loading
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) =>
+                        const Center(child: CircularProgressIndicator()),
                   );
 
-                  if (!rewardGiven && mounted) {
-                    SnackbarHelper.showError(
-                      context,
-                      'Ad not ready. Try again later.',
-                    );
+                  final res = await WorkerService().batchEvents(
+                    userId: uid,
+                    events: [event],
+                  );
+
+                  if (mounted) Navigator.of(context).pop();
+
+                  if (res['success'] == true) {
+                    // Refresh local user data
+                    await userProvider.loadUserData(uid);
+                    if (mounted) {
+                      AppRouter().goBack();
+                      SnackbarHelper.showSuccess(context, '🎉 Reward doubled!');
+                    }
+                  } else {
+                    if (mounted) {
+                      SnackbarHelper.showError(
+                        context,
+                        'Failed to award doubled reward',
+                      );
+                    }
                   }
                 } catch (e) {
-                  if (mounted) {
-                    SnackbarHelper.showError(context, 'Error showing ad: $e');
-                  }
+                  try {
+                    if (mounted) Navigator.of(context).pop();
+                  } catch (_) {}
+                  if (mounted) SnackbarHelper.showError(context, 'Error: $e');
                 }
               },
               icon: const Icon(Iconsax.play_circle),
@@ -247,7 +300,7 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
         builder: (context, userProvider, _) {
           final spinsRemaining = userProvider.userData?.totalSpins ?? 0;
 
-          return SingleChildScrollView(
+                return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
@@ -277,23 +330,53 @@ class _SpinWinScreenState extends State<SpinWinScreen> {
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(
-                          spinsPerDay,
-                          (index) => Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Icon(
-                              index < spinsRemaining
-                                  ? Iconsax.heart5
-                                  : Iconsax.heart,
-                              color: index < spinsRemaining
-                                  ? colorScheme.error
-                                  : colorScheme.outline.withAlpha(100),
-                              size: 32,
+                      Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              spinsPerDay,
+                              (index) => Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                                child: Icon(
+                                  index < spinsRemaining
+                                      ? Iconsax.heart5
+                                      : Iconsax.heart,
+                                  color: index < spinsRemaining
+                                      ? colorScheme.error
+                                      : colorScheme.outline.withAlpha(100),
+                                  size: 32,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          // Countdown to next reset at 04:30
+                          StreamBuilder<DateTime>(
+                            stream: Stream.periodic(const Duration(seconds: 1), (_) {
+                              final now = DateTime.now();
+                              var next = DateTime(now.year, now.month, now.day, 4, 30);
+                              if (!next.isAfter(now)) {
+                                // move to next day
+                                next = next.add(const Duration(days: 1));
+                              }
+                              return next;
+                            }),
+                            builder: (context, snap) {
+                              final target = snap.data ?? DateTime.now();
+                              final remaining = target.difference(DateTime.now());
+                              final twoDigits = (int n) => n.toString().padLeft(2, '0');
+                              final hours = twoDigits(remaining.inHours.remainder(24));
+                              final minutes = twoDigits(remaining.inMinutes.remainder(60));
+                              final seconds = twoDigits(remaining.inSeconds.remainder(60));
+                              return Text(
+                                'Resets in $hours:$minutes:$seconds',
+                                style: Theme.of(context).textTheme.labelSmall,
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ],
                   ),

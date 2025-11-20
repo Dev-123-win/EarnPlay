@@ -1,6 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:io';
+import 'dart:convert';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -39,10 +43,14 @@ class FirebaseService {
         password: password,
       );
 
+      // Generate device hash for device binding (prevents multi-accounting)
+      final deviceHash = await generateDeviceHash();
+
       await _createUserDocument(
         uid: credential.user!.uid,
         email: email,
         referralCode: referralCode,
+        deviceHash: deviceHash,
       );
 
       return credential.user;
@@ -64,6 +72,9 @@ class FirebaseService {
 
       final userCredential = await _auth.signInWithCredential(credential);
 
+      // Generate device hash for device binding (prevents multi-accounting)
+      final deviceHash = await generateDeviceHash();
+
       // Create user document if new user (using SetOptions merge to avoid overwriting)
       await _firestore.collection('users').doc(userCredential.user!.uid).set({
         'uid': userCredential.user!.uid,
@@ -73,6 +84,7 @@ class FirebaseService {
         'createdAt': FieldValue.serverTimestamp(),
         'referralCode': _generateReferralCode(),
         'referredBy': null,
+        'deviceHash': deviceHash,
         'dailyStreak': {
           'currentStreak': 0,
           'lastCheckIn': null,
@@ -109,6 +121,7 @@ class FirebaseService {
     required String uid,
     required String email,
     String? referralCode,
+    String? deviceHash,
   }) async {
     await _firestore.collection('users').doc(uid).set({
       'uid': uid,
@@ -117,6 +130,7 @@ class FirebaseService {
       'coins': 0, // Must start at 0 per security rules
       'referralCode': _generateReferralCode(),
       'referredBy': referralCode, // Can be null initially
+      'deviceHash': deviceHash ?? 'unknown', // Device binding for anti-fraud
       'createdAt': FieldValue.serverTimestamp(),
       'dailyStreak': {
         'currentStreak': 0,
@@ -143,7 +157,14 @@ class FirebaseService {
   }
 
   Future<void> updateUserCoins(String uid, int coins) async {
-    await _firestore.collection('users').doc(uid).update({'coins': coins});
+    // IMPORTANT: Treat `coins` as a delta (positive or negative) and
+    // perform an atomic increment to avoid race conditions.
+    // Previous implementation wrote absolute values which caused
+    // lost updates when concurrent writes occurred.
+    await _firestore.collection('users').doc(uid).update({
+      'coins': FieldValue.increment(coins),
+      'lastUpdated': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> updateDailyStreak(
@@ -176,6 +197,47 @@ class FirebaseService {
       return 'REF$uid$timestamp';
     }
     return 'REF${DateTime.now().millisecondsSinceEpoch.toString().substring(0, 8)}';
+  }
+
+  /// Generate secure device hash for device binding
+  /// Prevents one device = multiple accounts (referral farming)
+  /// Uses SHA256 hash of device ID for privacy
+  Future<String> generateDeviceHash() async {
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      late String deviceId;
+
+      if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        deviceId = androidInfo.id; // Android Device ID
+      } else if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        deviceId = iosInfo.identifierForVendor ?? 'unknown'; // iOS vendor ID
+      } else {
+        deviceId = 'web_user'; // Web platform fallback
+      }
+
+      // Hash for privacy (SHA256)
+      final bytes = utf8.encode(deviceId);
+      final hash = sha256.convert(bytes).toString();
+
+      return hash;
+    } catch (e) {
+      return 'error_hash';
+    }
+  }
+
+  /// Store device hash on signup
+  /// Linked to user document for device binding
+  Future<void> storeDeviceHash(String uid, String deviceHash) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({
+        'deviceHash': deviceHash,
+        'lastRecordedDeviceHash': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception('Failed to store device hash: $e');
+    }
   }
 
   String _handleAuthError(FirebaseAuthException e) {

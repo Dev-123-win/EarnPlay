@@ -43,10 +43,13 @@ class _ReferralScreenState extends State<ReferralScreen> {
         _claimController.text.trim(),
       );
       if (mounted) {
-        SnackbarHelper.showSuccess(
-          context,
-          'Referral code claimed! You earned 50',
-        );
+        // Show detailed success with referrer info when available
+        final referrer = context.read<UserProvider>().userData?.referredBy;
+        final message = referrer != null
+            ? 'Referral code claimed! You earned 50. Referred by: $referrer'
+            : 'Referral code claimed! You earned 50.';
+
+        SnackbarHelper.showSuccess(context, message);
         _claimController.clear();
       }
     } catch (e) {
@@ -278,11 +281,25 @@ class _ReferralScreenState extends State<ReferralScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Have a referral code?',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Have a referral code?',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        // Show allowed window hint
+                        Text(
+                          'Enter within 24 hours',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     // Inline search-bar style

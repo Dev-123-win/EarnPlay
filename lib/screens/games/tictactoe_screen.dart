@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'dart:async';
 import '../../providers/user_provider.dart';
 import '../../providers/game_provider.dart';
 import '../../utils/animation_helper.dart';
@@ -47,13 +48,27 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
   /// CRITICAL: Handle app lifecycle changes
   /// Flushes game session when app goes to background
   /// Prevents data loss if user force-closes app
+  /// MUST AWAIT to ensure flush completes before app is killed
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
-      // App going to background - flush immediately
+      // App going to background - flush game session AND event queue
       final uid = context.read<UserProvider>().userData?.uid;
       if (uid != null) {
-        context.read<GameProvider>().flushGameSession(uid);
+        // CRITICAL: Flush both game session and event queue
+        // This prevents data loss if user force-closes app
+        unawaited(
+          Future.wait([
+                context.read<GameProvider>().flushGameSession(uid),
+                context.read<UserProvider>().flushEventQueue(),
+              ])
+              .then((_) {
+                debugPrint('[GameScreen] Flushed on app pause');
+              })
+              .catchError((e) {
+                debugPrint('Failed to flush on pause: $e');
+              }),
+        );
       }
     }
   }
@@ -305,24 +320,26 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
                         }
                         if (mounted) {
                           AppRouter().goBack();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.check_circle,
-                                    color: Colors.white,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    '🎁 Earned $doubledCoinsWon coins (doubled)!',
-                                  ),
-                                ],
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.check_circle,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      '🎁 Earned $doubledCoinsWon coins (doubled)!',
+                                    ),
+                                  ],
+                                ),
+                                backgroundColor: colorScheme.tertiary,
+                                duration: const Duration(seconds: 3),
                               ),
-                              backgroundColor: colorScheme.tertiary,
-                              duration: const Duration(seconds: 3),
-                            ),
-                          );
+                            );
+                          }
                           setState(() => _initializeGame());
                         }
                       } catch (e) {
@@ -339,12 +356,14 @@ class _TicTacToeScreenState extends State<TicTacToeScreen>
                   );
                   if (!rewardGiven && mounted) {
                     AppRouter().goBack();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Ad not ready. Try again later.'),
-                        backgroundColor: colorScheme.secondary,
-                      ),
-                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Ad not ready. Try again later.'),
+                          backgroundColor: colorScheme.secondary,
+                        ),
+                      );
+                    }
                     setState(() => _initializeGame());
                   }
                 } catch (e) {

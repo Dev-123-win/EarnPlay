@@ -227,6 +227,13 @@ class _DoubleBackPressExitWidgetState extends State<DoubleBackPressExitWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(onWillPop: _handleWillPop, child: widget.child);
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleWillPop();
+      },
+      child: widget.child,
+    );
   }
 }

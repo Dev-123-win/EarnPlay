@@ -23,29 +23,54 @@ import { REWARDS, LIMITS, TIMEOUTS, ACTION_TYPES } from '../utils/constants.js';
  */
 export async function handleAdReward(request, db, userId, ctx) {
   try {
-    // 1. Parse and validate request body
-    const { adUnitId, timestamp } = await validateRequest(request, {
+    // Expected body: { adUnitId: string, timestamp: number, challengeId: string }
+    const { adUnitId, timestamp, challengeId, idempotencyKey } = await validateRequest(request, {
       adUnitId: 'string',
-      timestamp: 'number'
+      timestamp: 'number',
+      challengeId: 'string'
     });
 
-    // 2. Validate timestamp (anti-replay attack)
+    // Anti-replay: timestamp must be recent
     validateTimestamp(timestamp, TIMEOUTS.REQUEST_AGE_MAX);
 
-    // 3. Validate ad unit ID format
+    // Validate ad unit ID format
     if (!adUnitId || adUnitId.length < 5) {
       return handleError('Invalid ad unit ID format', 400);
     }
+
+    // Validate challenge in KV (single-use, short TTL)
+    const challengeKey = `ad-challenge:${userId}:${challengeId}`;
+    const raw = await ctx.env.KV_AD_CHALLENGES.get(challengeKey);
+
+    if (!raw) {
+      return handleError('Invalid or expired ad challenge', 400);
+    }
+
+    let challenge;
+    try {
+      challenge = JSON.parse(raw);
+    } catch (e) {
+      // Corrupted challenge
+      await ctx.env.KV_AD_CHALLENGES.delete(challengeKey);
+      return handleError('Invalid ad challenge data', 400);
+    }
+
+    // Ensure challenge matches adUnit and user
+    if (challenge.adUnitId !== adUnitId || challenge.userId !== userId) {
+      await ctx.env.KV_AD_CHALLENGES.delete(challengeKey);
+      return handleError('Ad challenge mismatch', 400);
+    }
+
+    // Single-use: delete challenge to prevent replay
+    await ctx.env.KV_AD_CHALLENGES.delete(challengeKey);
 
     const reward = REWARDS.AD_WATCH;
     const userRef = db.collection('users').doc(userId);
     let result;
 
-    // 4. ATOMIC TRANSACTION: Read + Validate + Write
+    // ATOMIC: validate limits and award reward
     await atomicTransaction(db, async (transaction) => {
-      // Read user data within transaction (free, no extra read cost)
       const userSnap = await transaction.get(userRef);
-
       if (!userSnap.exists) {
         const err = new Error('User not found in database');
         err.status = 404;
@@ -53,33 +78,21 @@ export async function handleAdReward(request, db, userId, ctx) {
       }
 
       const userData = userSnap.data();
-
-      // Validate user has required fields
       if (userData.coins === undefined) {
         const err = new Error('User data corrupted: missing coins field');
         err.status = 500;
         throw err;
       }
 
-      // Check daily ad limit with lazy reset
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-      const lastAdResetDate = userData.lastAdResetDate;
-      const lastAdResetDateString = lastAdResetDate
-        ? new Date(lastAdResetDate.toDate()).toISOString().split('T')[0]
-        : null;
+      const isNewDay = hasDateChanged(userData.lastAdResetDate);
+      const watchedToday = isNewDay ? 0 : (userData.watchedAdsToday || 0);
 
-      // Determine if new day (lazy reset)
-      const isNewDay = hasDateChanged(lastAdResetDate);
-      const watchedToday = isNewDay ? 0 : userData.watchedAdsToday || 0;
-
-      // Validate daily limit
       if (watchedToday >= LIMITS.ADS_PER_DAY) {
         const err = new Error(`Daily ad limit reached (${LIMITS.ADS_PER_DAY}/day)`);
-        err.status = 429; // Too Many Requests
+        err.status = 429;
         throw err;
       }
 
-      // All validations passed, perform atomic update
       transaction.update(userRef, {
         coins: incrementCoins(reward),
         watchedAdsToday: watchedToday + 1,
@@ -91,13 +104,13 @@ export async function handleAdReward(request, db, userId, ctx) {
       result = {
         success: true,
         reward,
-        newBalance: userData.coins + reward,
+        newBalance: (userData.coins || 0) + reward,
         adsWatchedToday: watchedToday + 1,
         adUnitId
       };
     });
 
-    // 5. Async audit log (fire-and-forget using ctx.waitUntil)
+    // Async audit log
     ctx.waitUntil(
       addAuditLog(db, userId, ACTION_TYPES.AD_WATCHED, {
         reward,

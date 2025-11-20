@@ -1,4 +1,5 @@
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:flutter/foundation.dart';
 
 /// Service to manage all AdMob advertisements with AdMob Policy Compliance
 ///
@@ -21,19 +22,17 @@ class AdService {
 
   AdService._internal();
 
-  /// AdMob App ID
-  static const String appId = 'ca-app-pub-3863562453957252~2306547174';
+  /// AdMob App ID (modifiable for debug/test)
+  static String appId = 'ca-app-pub-3863562453957252~2306547174';
 
-  /// Ad Unit IDs
-  static const String appOpenAdId = 'ca-app-pub-3863562453957252/7316428755';
-  static const String rewardedInterstitialAdId =
+  /// Ad Unit IDs (use test IDs in debug)
+  static String appOpenAdId = 'ca-app-pub-3863562453957252/7316428755';
+  static String rewardedInterstitialAdId =
       'ca-app-pub-3863562453957252/5980806527';
-  static const String bannerAdId = 'ca-app-pub-3863562453957252/4000539271';
-  static const String interstitialAdId =
-      'ca-app-pub-3863562453957252/3669366780';
-  static const String nativeAdvancedAdId =
-      'ca-app-pub-3863562453957252/6003347084';
-  static const String rewardedAdId = 'ca-app-pub-3863562453957252/2356285112';
+  static String bannerAdId = 'ca-app-pub-3863562453957252/4000539271';
+  static String interstitialAdId = 'ca-app-pub-3863562453957252/3669366780';
+  static String nativeAdvancedAdId = 'ca-app-pub-3863562453957252/6003347084';
+  static String rewardedAdId = 'ca-app-pub-3863562453957252/2356285112';
 
   /// Current instances
   AppOpenAd? _appOpenAd;
@@ -54,13 +53,25 @@ class AdService {
   DateTime? _hourlyResetTime;
 
   /// Track retry attempts for exponential backoff
-  final Map<String, int> _retryAttempts = {}; // 'banner', 'interstitial', 'rewarded'
+  final Map<String, int> _retryAttempts =
+      {}; // 'banner', 'interstitial', 'rewarded'
 
   /// Initialize Google Mobile Ads
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
+      // Use Google-provided test ad unit IDs when running in debug mode
+      if (kDebugMode) {
+        appId = 'ca-app-pub-3940256099942544~3347511713';
+        appOpenAdId = 'ca-app-pub-3940256099942544/3419835294';
+        rewardedInterstitialAdId = 'ca-app-pub-3940256099942544/5354046379';
+        bannerAdId = 'ca-app-pub-3940256099942544/6300978111';
+        interstitialAdId = 'ca-app-pub-3940256099942544/1033173712';
+        nativeAdvancedAdId = 'ca-app-pub-3940256099942544/2247696110';
+        rewardedAdId = 'ca-app-pub-3940256099942544/5224354917';
+      }
+
       await MobileAds.instance.initialize();
       _isInitialized = true;
     } catch (e) {
@@ -75,8 +86,9 @@ class AdService {
 
     // Check 2-minute minimum between interstitials
     if (_lastInterstitialShowTime != null) {
-      final timeSinceLastAd =
-          now.difference(_lastInterstitialShowTime!).inSeconds;
+      final timeSinceLastAd = now
+          .difference(_lastInterstitialShowTime!)
+          .inSeconds;
       if (timeSinceLastAd < 120) {
         // 2 minutes = 120 seconds
         return false; // Too soon
@@ -460,19 +472,19 @@ class AdService {
     try {
       bool rewardGiven = false;
 
-      _rewardedInterstitialAd!
-          .fullScreenContentCallback = FullScreenContentCallback(
-        onAdShowedFullScreenContent: (ad) {},
-        onAdFailedToShowFullScreenContent: (ad, error) {
-          ad.dispose();
-          _rewardedInterstitialAd = null;
-        },
-        onAdDismissedFullScreenContent: (ad) {
-          ad.dispose();
-          _rewardedInterstitialAd = null;
-          loadRewardedInterstitialAd(); // Preload next
-        },
-      );
+      _rewardedInterstitialAd!.fullScreenContentCallback =
+          FullScreenContentCallback(
+            onAdShowedFullScreenContent: (ad) {},
+            onAdFailedToShowFullScreenContent: (ad, error) {
+              ad.dispose();
+              _rewardedInterstitialAd = null;
+            },
+            onAdDismissedFullScreenContent: (ad) {
+              ad.dispose();
+              _rewardedInterstitialAd = null;
+              loadRewardedInterstitialAd(); // Preload next
+            },
+          );
 
       _rewardedInterstitialAd!.show(
         onUserEarnedReward: (ad, reward) {
@@ -600,34 +612,12 @@ class AdService {
 
   /// Request Ad Consent for GDPR compliance
   Future<void> requestConsentIfNeeded() async {
-    try {
-      ConsentInformation.instance.requestConsentInfoUpdate(
-        ConsentRequestParameters(),
-        _onConsentInfoUpdateSuccess,
-        _onConsentInfoUpdateFailure,
-      );
-    } catch (e) {
-      // Silent fail
-    }
-  }
-
-  void _onConsentInfoUpdateSuccess() {
-    _loadAndShowConsentForm();
-  }
-
-  void _onConsentInfoUpdateFailure(FormError formError) {
-    // Handle failure silently
-  }
-
-  Future<void> _loadAndShowConsentForm() async {
-    try {
-      if (await ConsentInformation.instance.isConsentFormAvailable()) {
-        await ConsentForm.loadAndShowConsentFormIfRequired((formError) {
-          // Handle error silently
-        });
-      }
-    } catch (e) {
-      // Silent fail
-    }
+    // NOTE: Consent (UMP) integration is optional and requires adding
+    // the User Messaging Platform (UMP) dependency. The project currently
+    // does not include a UMP package in `pubspec.yaml`, and the automatic
+    // references caused build errors on some platforms. To keep the app
+    // buildable, consent handling is a no-op here. Add a UMP package and
+    // implement consent flow in production if required for your territory.
+    return Future.value();
   }
 }

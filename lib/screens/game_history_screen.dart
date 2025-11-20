@@ -230,7 +230,7 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                           Icon(
                             Icons.history,
                             size: 48,
-                            color: colorScheme.primary.withValues(alpha: 128),
+                            color: colorScheme.primary.withAlpha(128),
                           ),
                           const SizedBox(height: 12),
                           Text(
@@ -267,7 +267,7 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
     return ScaleFadeAnimation(
       child: Card(
         elevation: 0,
-        color: color.withValues(alpha: 25),
+        color: color.withAlpha(25),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -360,7 +360,7 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: resultColor.withValues(alpha: 25),
+                            color: resultColor.withAlpha(25),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
@@ -420,7 +420,7 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: colorScheme.tertiary.withValues(alpha: 25),
+                    color: colorScheme.tertiary.withAlpha(25),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

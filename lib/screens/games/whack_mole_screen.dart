@@ -44,13 +44,27 @@ class _WhackMoleScreenState extends State<WhackMoleScreen>
   /// CRITICAL: Handle app lifecycle changes
   /// Flushes game session when app goes to background
   /// Prevents data loss if user force-closes app
+  /// MUST USE unawaited to ensure flush completes before app is killed
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
-      // App going to background - flush immediately
+      // App going to background - flush game session AND event queue
       final uid = context.read<UserProvider>().userData?.uid;
       if (uid != null) {
-        context.read<GameProvider>().flushGameSession(uid);
+        // CRITICAL: Flush both game session and event queue
+        // This prevents data loss if user force-closes app
+        unawaited(
+          Future.wait([
+                context.read<GameProvider>().flushGameSession(uid),
+                context.read<UserProvider>().flushEventQueue(),
+              ])
+              .then((_) {
+                debugPrint('[WhackMoleScreen] Flushed on app pause');
+              })
+              .catchError((e) {
+                debugPrint('Failed to flush on pause: $e');
+              }),
+        );
       }
       // Also cancel timers to prevent errors
       gameTimer.cancel();

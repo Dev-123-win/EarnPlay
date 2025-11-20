@@ -295,11 +295,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             icon: Iconsax.activity,
                             color: colorScheme.tertiary,
-                            onTap: () {
-                              // Daily Streak is accessible via bottom nav (Streak tab)
-                            },
+                            onTap: () async =>
+                                await AppRouter().goToDailyStreak(),
                             boxShadow: BoxShadow(
-                              color: colorScheme.tertiary.withOpacity(0.1),
+                              color: colorScheme.tertiary.withValues(
+                                alpha: 0.1,
+                              ),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
@@ -317,11 +318,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             icon: Iconsax.play_circle,
                             color: colorScheme.primary,
-                            onTap: () {
-                              // Watch Ads is accessible via bottom nav (Earn tab)
-                            },
+                            onTap: () async =>
+                                await AppRouter().goToWatchEarn(),
                             boxShadow: BoxShadow(
-                              color: colorScheme.primary.withOpacity(0.1),
+                              color: colorScheme.primary.withValues(alpha: 0.1),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
@@ -341,7 +341,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: AppTheme.streakColor,
                             onTap: () async => await AppRouter().goToSpinWin(),
                             boxShadow: BoxShadow(
-                              color: AppTheme.streakColor.withOpacity(0.1),
+                              color: AppTheme.streakColor.withValues(
+                                alpha: 0.1,
+                              ),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
@@ -349,8 +351,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                AppTheme.streakColor.withAlpha(12),
-                                AppTheme.streakColor.withAlpha(24),
+                                AppTheme.streakColor.withValues(alpha: 0.047),
+                                AppTheme.streakColor.withValues(alpha: 0.094),
                               ],
                             ),
                           ),
@@ -370,7 +372,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             onTap: () async =>
                                 await AppRouter().goToTicTacToe(),
                             boxShadow: BoxShadow(
-                              color: colorScheme.secondary.withOpacity(0.1),
+                              color: colorScheme.secondary.withValues(
+                                alpha: 0.1,
+                              ),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
@@ -391,8 +395,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             onTap: () async =>
                                 await AppRouter().goToWhackMole(),
                             boxShadow: BoxShadow(
-                              color: colorScheme.primaryContainer.withOpacity(
-                                0.1,
+                              color: colorScheme.primaryContainer.withValues(
+                                alpha: 0.1,
                               ),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
@@ -533,7 +537,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: colorScheme.shadow.withOpacity(0.1),
+                                color: colorScheme.shadow.withValues(
+                                  alpha: 0.1,
+                                ),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4),
                               ),

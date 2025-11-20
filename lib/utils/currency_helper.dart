@@ -42,7 +42,9 @@ class CurrencyDisplay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String coinAmount = NumberFormat.decimalPattern().format(coins);
-    final String realCurrencyAmount = CurrencyHelper.convertCoinsToRealCurrency(coins);
+    final String realCurrencyAmount = CurrencyHelper.convertCoinsToRealCurrency(
+      coins,
+    );
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -50,23 +52,22 @@ class CurrencyDisplay extends StatelessWidget {
       crossAxisAlignment: crossAlignment,
       children: [
         Image.asset(
-          'coin.png',
+          'assets/coin.svg',
           height: coinSize,
           width: coinSize,
           fit: BoxFit.contain,
         ),
         SizedBox(width: spacing),
-        Text(
-          coinAmount,
-          style: textStyle,
-        ),
+        Text(coinAmount, style: textStyle),
         if (showRealCurrency) ...[
           SizedBox(width: spacing / 2),
           Text(
             '($realCurrencyAmount)',
             style: textStyle?.copyWith(
-              fontSize: (textStyle?.fontSize ?? 16) * 0.7, // Smaller font for real currency
-              color: textStyle?.color?.withOpacity(0.7),
+              fontSize:
+                  (textStyle?.fontSize ?? 16) *
+                  0.7, // Smaller font for real currency
+              color: textStyle?.color?.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -93,14 +94,16 @@ class InlineCurrency extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String coinAmount = NumberFormat.decimalPattern().format(coins);
-    final String realCurrencyAmount = CurrencyHelper.convertCoinsToRealCurrency(coins);
+    final String realCurrencyAmount = CurrencyHelper.convertCoinsToRealCurrency(
+      coins,
+    );
 
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 2,
       children: [
         Image.asset(
-          'coin.png',
+          'assets/coin.svg',
           height: coinSize,
           width: coinSize,
           fit: BoxFit.contain,
@@ -110,8 +113,10 @@ class InlineCurrency extends StatelessWidget {
           Text(
             '($realCurrencyAmount)',
             style: textStyle?.copyWith(
-              fontSize: (textStyle?.fontSize ?? 14) * 0.7, // Smaller font for real currency
-              color: textStyle?.color?.withOpacity(0.7),
+              fontSize:
+                  (textStyle?.fontSize ?? 14) *
+                  0.7, // Smaller font for real currency
+              color: textStyle?.color?.withValues(alpha: 0.7),
             ),
           ),
       ],

@@ -46,4 +46,5 @@ app.*.map.json
 
 # Backend folder (managed separately)
 my-backend/
+my-backend/wrangler.jsonc
 

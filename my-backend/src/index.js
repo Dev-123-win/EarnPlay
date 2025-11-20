@@ -3,6 +3,7 @@ import { initFirebase } from './utils/firebase.js';
 import { handleError } from './utils/validation.js';
 import { handleAdReward } from './endpoints/ad.js';
 import { handleWithdrawal, handleReferral } from './endpoints/withdrawal_referral.js';
+import { handleBatchEvents } from './endpoints/batch_events.js';
 
 /**
  * Handle CORS preflight requests
@@ -84,8 +85,24 @@ export default {
       let response;
 
       switch (path) {
+        case '/batch-events':
+          response = await handleBatchEvents(request, db, userId, ctx);
+          break;
+        case '/ad-challenge':
+          // Issue short-lived ad challenge token (single-use)
+          response = await import('./endpoints/ad_challenge.js').then(m => m.handleAdChallenge(request, db, userId, ctx));
+          break;
+
         case '/verify-ad':
           response = await handleAdReward(request, db, userId, ctx);
+          break;
+
+        case '/process-withdrawals':
+          response = await import('./endpoints/process_withdrawals.js').then(m => m.handleProcessWithdrawals(request, db, userId, ctx));
+          break;
+
+        case '/payout-webhook':
+          response = await import('./endpoints/payout_webhook.js').then(m => m.handlePayoutWebhook(request, db, userId, ctx));
           break;
 
         case '/request-withdrawal':

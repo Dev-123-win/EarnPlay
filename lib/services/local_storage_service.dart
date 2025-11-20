@@ -6,6 +6,7 @@ class LocalStorageService {
   static UserData? _cachedUserData;
   static late SharedPreferences _prefs;
   static const String _userDataKey = 'user_data_cache';
+  static const String _userCoinsKey = 'user_coins_cache';
   static const String _lastSyncKey = 'last_sync_timestamp';
 
   static Future<void> initialize() async {
@@ -27,6 +28,32 @@ class LocalStorageService {
 
   static Future<UserData?> getUserData() async {
     return _cachedUserData;
+  }
+
+  // Convenience: store just the coins value separately for lightweight access
+  static Future<void> saveUserCoins(int coins) async {
+    try {
+      await _prefs.setInt(_userCoinsKey, coins);
+      if (_cachedUserData != null) {
+        _cachedUserData!.coins = coins;
+        // also persist full user data
+        await saveUserData(_cachedUserData!);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  static Future<int?> getUserCoins() async {
+    try {
+      if (_prefs.containsKey(_userCoinsKey)) {
+        return _prefs.getInt(_userCoinsKey);
+      }
+      if (_cachedUserData != null) return _cachedUserData!.coins;
+      return null;
+    } catch (e) {
+      return null;
+    }
   }
 
   static Future<void> saveUserData(UserData data) async {
